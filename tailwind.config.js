@@ -2,8 +2,8 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}"
+    "./*.{js,ts,jsx,tsx}",           // <--- This checks files in the root (like App.tsx)
+    "./components/**/*.{js,ts,jsx,tsx}", // <--- This checks your components folder
   ],
   theme: {
     extend: {},
