@@ -1,4 +1,4 @@
-export interface VerbConjugation {
+export interface ConjugationSet {
   io: string;
   tu: string;
   lui_lei: string;
@@ -10,17 +10,16 @@ export interface VerbConjugation {
 export interface VerbEntry {
   infinitive: string;
   definition: string;
-  conjugation: VerbConjugation;
-}
-
-export interface SelectionState {
-  text: string;
-  rect: DOMRect | null;
-  isVisible: boolean;
-}
-
-export enum SearchStatus {
-  IDLE = 'IDLE',
-  FOUND = 'FOUND',
-  NOT_FOUND = 'NOT_FOUND',
+  auxiliary: string;
+  participle: string;
+  gerund: string;
+  tenses: {
+    present: ConjugationSet;
+    imperfect: ConjugationSet;
+    pastRemote: ConjugationSet; // Passato Remoto
+    future: ConjugationSet;
+    conditional: ConjugationSet;
+    subjunctivePresent: ConjugationSet;
+    subjunctiveImperfect: ConjugationSet;
+  }
 }

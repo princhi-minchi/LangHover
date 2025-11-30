@@ -16,5 +16,11 @@
   "action": {
     "default_popup": "index.html",
     "default_title": "Italian Verb Settings"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["verbs.csv"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

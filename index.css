@@ -1,1 +1,12 @@
-@import "tailwindcss";
+/* We import layers individually to avoid the "Preflight" (global reset) */
+@import "tailwindcss/theme";
+@import "tailwindcss/utilities";
+
+/* Since we removed Preflight, we need to manually set some defaults 
+  ONLY for our extension container.
+*/
+#langhover-extension-root {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
