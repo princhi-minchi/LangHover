@@ -1,77 +1,59 @@
+/* 1. IMPORT TAILWIND (Without Preflight/Global Reset) */
 @import "tailwindcss/theme";
 @import "tailwindcss/utilities";
 
-/* 1. BASE CONTAINER STYLES 
-  This sets the defaults for your app so it ignores the host page's "Body" styles.
+/* 2. THE NUCLEAR RESET (Isolation Layer)
+   'all: initial' tells the browser: "Forget everything the website told you 
+   about styling. Reset this element to a blank slate."
 */
 #langhover-extension-root {
-  /* Force a standard font stack to avoid inheriting weird fonts */
+  all: initial; /* <--- The magic line */
+  
+  /* Since 'initial' makes it inline, we must re-declare basic layout rules */
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 2147483647;
+  pointer-events: none;
+
+  /* Re-establish standard font settings so 'em' units work */
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  
-  /* Reset text settings that might be inherited from dark mode sites */
-  color: #0f172a; /* slate-900 */
-  text-align: left;
+  font-size: 16px; /* Locks the base size so 1rem = 16px usually */
   line-height: 1.5;
-  font-size: 16px;
-  font-weight: normal;
-  letter-spacing: normal;
-  
-  /* Reset visibility/pointer events */
-  text-transform: none;
-  pointer-events: none; /* The container itself lets clicks through */
-  z-index: 2147483647; /* Max Z-Index */
+  color: #0f172a; /* Slate 900 */
+  text-align: left;
 }
 
-/* 2. THE "CSS FORTRESS" (SCOPED RESET)
-  This targets EVERYTHING inside your extension and strips away the host website's influence.
+/* 3. RESET ALL CHILDREN
+   Ensures buttons, inputs, and divs inside your app behave normally
 */
-#langhover-extension-root *,
-#langhover-extension-root *::before,
-#langhover-extension-root *::after {
-  /* Crucial: Stops websites from messing up your widths/heights */
+#langhover-extension-root * {
   box-sizing: border-box;
-  
-  /* Reset margins and paddings so Reddit/Google defaults don't push things around */
-  margin: 0;
-  padding: 0;
-  
-  /* Reset borders so buttons don't have weird outlines */
-  border-width: 0;
-  border-style: solid;
-  border-color: #e5e7eb; /* gray-200 default */
-  
-  /* Ensure background colors don't bleed through */
-  background-origin: border-box;
-  background-repeat: no-repeat;
 }
 
-/* 3. SPECIFIC ELEMENT RESETS 
-  Buttons and Inputs are the most likely to look broken on other sites.
-*/
+/* Fix for buttons looking weird on some sites */
 #langhover-extension-root button {
-  background-color: transparent;
-  background-image: none;
   cursor: pointer;
-  
-  /* Reset default button styles */
-  appearance: button;
-  -webkit-appearance: button;
-  text-transform: none;
-  font-family: inherit;
-  font-size: 100%;
-  line-height: inherit;
-  margin: 0;
+  background: transparent;
+  border: none;
   padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-transform: none;
+  appearance: button;
 }
 
-/* Allow pointer events on the actual card and its children */
+/* Enable clicking on your card */
 #langhover-extension-root > div {
   pointer-events: auto;
 }
 
-/* 4. SCROLLBAR HIDING 
-  Keeps your popup looking clean.
-*/
+/* Hide scrollbars for the tabs */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
