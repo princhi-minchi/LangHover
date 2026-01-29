@@ -14,9 +14,10 @@ export default function ExtensionOverlay() {
     translation?: string | null;
   } | null>(null);
 
-  // 1. Load Data Async
+  // 1. Load Data Async & Settings
   useEffect(() => {
     const load = async () => {
+      // Load verb data
       const text = await fetchVerbData();
       const data = parseCSV(text);
       setVerbData(data);
@@ -82,7 +83,19 @@ export default function ExtensionOverlay() {
 
         // 2. Fetch translation
         try {
-          const translated = await translateText(text, 'en');
+          // Get target language
+          let target = 'en';
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            const result = await new Promise<{ targetLang?: string }>(resolve =>
+              chrome.storage.local.get(['targetLang'], (items) => resolve(items as { targetLang?: string }))
+            );
+            if (result.targetLang) target = result.targetLang;
+          } else {
+            const saved = localStorage.getItem('targetLang');
+            if (saved) target = saved;
+          }
+
+          const translated = await translateText(text, target);
           // Update state only if user hasn't selected something else in the meantime
           // A simple way is to check if selection is still the same word, 
           // but for now we will just update the state.

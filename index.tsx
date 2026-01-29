@@ -2,18 +2,39 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import ExtensionOverlay from './components/ExtensionOverlay';
+import Settings from './components/Settings';
 import './index.css';
 
 const rootElement = document.getElementById('langhover-dev-root');
 
 if (rootElement) {
-  // 1. DEV MODE (npm run dev)
-  // Just render normally for testing
-  ReactDOM.createRoot(rootElement).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
+  // 1. POPUP or DEV MODE
+  // If we are in the extension popup, we want to show Settings.
+  // If we are in standard dev mode (npm run dev), we usually want to show the Demo App.
+
+  // A simple heuristic: check if chrome.runtime.id is available to detect extension context.
+  // OR check if we have a specific query param.
+  // Since the user wants to replace the "test" page with settings in the extension,
+  // and the extension popup loads index.html:
+
+  const isExtensionContext = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+
+  if (isExtensionContext) {
+    // Extension Popup -> Settings
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <Settings />
+      </React.StrictMode>
+    );
+  } else {
+    // Dev Mode -> Test Page (App)
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+  }
+
 } else {
   // 2. EXTENSION MODE (Real Website)
 
