@@ -53,7 +53,9 @@ export default function TranslationCard({ word, entry, style }: TranslationCardP
     // Safety check: sometimes data might be missing a field
     const displayValue = value || '-';
     // Check match against the full value (e.g. "ho mangiato") or just the main word
-    const isMatch = displayValue.toLowerCase() === cleanWord || displayValue.toLowerCase().includes(cleanWord);
+    // We split by spaces to ensure "ha" doesn't match "hanno" (exact word match only)
+    const isMatch = displayValue.toLowerCase() === cleanWord || 
+                   displayValue.toLowerCase().split(' ').some(w => w === cleanWord);
     
     return (
       <div className="flex flex-col group cursor-default">
