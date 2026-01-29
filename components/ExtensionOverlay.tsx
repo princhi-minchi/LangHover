@@ -4,14 +4,16 @@ import { fetchVerbData } from '../services/csvData';
 import { translateText } from '../services/translationService';
 import { VerbEntry } from '../types';
 import TranslationCard from './TranslationCard';
+import PhraseOverlay from './PhraseOverlay';
 
 export default function ExtensionOverlay() {
   const [verbData, setVerbData] = useState<Record<string, VerbEntry>>({});
   const [selection, setSelection] = useState<{
     word: string;
-    entry: VerbEntry;
+    entry?: VerbEntry;
     style: React.CSSProperties;
     translation?: string | null;
+    isPhrase?: boolean;
   } | null>(null);
 
   // 1. Load Data Async & Settings
@@ -25,16 +27,6 @@ export default function ExtensionOverlay() {
     load();
   }, []);
 
-  // ... (keep the rest of your useEffect for handleGlobalSelection exactly as it was)
-  // ... (ensure you define handleGlobalSelection and attach listeners like before)
-
-  // NOTE: You must include the handleGlobalSelection logic here. 
-  // I am omitting it for brevity, but copy it from your previous file.
-  // The only change is that 'verbData' is now populated asynchronously.
-
-  // ... rest of component
-
-  // Quick re-paste of listener logic for safety:
   useEffect(() => {
     const handleGlobalSelection = async () => {
       const selectionObj = window.getSelection();
@@ -43,43 +35,61 @@ export default function ExtensionOverlay() {
         return;
       }
       const text = selectionObj.toString().trim();
-      if (!text || text.includes(' ')) {
+      if (!text) {
         setSelection(null);
         return;
       }
-      const cleanText = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "");
-      const entry = verbData[cleanText];
 
-      if (entry) {
+      // Check if it's a phrase (more than one word)
+      const isPhrase = text.includes(' ');
+
+      // Determine clean text for verb lookup
+      const cleanText = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "");
+
+      let entry: VerbEntry | undefined;
+
+      // Only look for verb entry if it is NOT a phrase (single word)
+      if (!isPhrase) {
+        entry = verbData[cleanText];
+      }
+
+      // If it's a phrase OR a recognized verb
+      if (isPhrase || entry) {
         const range = selectionObj.getRangeAt(0);
         const rect = range.getBoundingClientRect();
 
-        // ... (Your positioning logic) ...
         const viewportHeight = window.innerHeight;
         const viewportWidth = window.innerWidth;
         const CARD_WIDTH = 320;
-        const CARD_HEIGHT = 300;
+        const CARD_HEIGHT = isPhrase ? 100 : 300; // Smaller height for phrase overlay approx
         const GAP = 12;
+
         let left = rect.left + (rect.width / 2) - (CARD_WIDTH / 2);
         left = Math.max(16, Math.min(left, viewportWidth - CARD_WIDTH - 16));
+
         const spaceBelow = viewportHeight - rect.bottom;
         let style: React.CSSProperties = { left };
+
         if (spaceBelow < (CARD_HEIGHT + GAP) && rect.top > (CARD_HEIGHT + GAP)) {
           style.bottom = viewportHeight - rect.top + GAP;
         } else {
           style.top = rect.bottom + GAP;
         }
 
-
-
-        // CHECK: If word matches current selection, update position only and preserve translation.
+        // CHECK: If content matches current selection, update position only and protect translation state
         if (selection && selection.word === text) {
-          setSelection(prev => prev ? ({ ...prev, style, entry }) : null);
+          setSelection(prev => prev ? ({ ...prev, style, entry, isPhrase }) : null);
           return;
         }
 
         // 1. Set initial state (loading)
-        setSelection({ word: text, entry, style, translation: null });
+        setSelection({
+          word: text,
+          entry,
+          style,
+          translation: null,
+          isPhrase
+        });
 
         // 2. Fetch translation
         try {
@@ -96,10 +106,7 @@ export default function ExtensionOverlay() {
           }
 
           const translated = await translateText(text, target);
-          // Update state only if user hasn't selected something else in the meantime
-          // A simple way is to check if selection is still the same word, 
-          // but for now we will just update the state.
-          // React state updates are functional, so we can ensure we are updating the right thing.
+
           setSelection(prev => {
             if (prev && prev.word === text) {
               return { ...prev, translation: translated };
@@ -116,6 +123,7 @@ export default function ExtensionOverlay() {
           });
         }
       } else {
+        // Not a phrase and not a known verb
         setSelection(null);
       }
     };
@@ -130,12 +138,27 @@ export default function ExtensionOverlay() {
 
   if (!selection) return null;
 
-  return (
-    <TranslationCard
-      word={selection.word}
-      entry={selection.entry}
-      style={selection.style}
-      translation={selection.translation}
-    />
-  );
+  if (selection.isPhrase) {
+    return (
+      <PhraseOverlay
+        originalText={selection.word}
+        translation={selection.translation || null}
+        style={selection.style}
+      />
+    );
+  }
+
+  // Must be a verb entry if we got here and !isPhrase, but strictly verify
+  if (selection.entry) {
+    return (
+      <TranslationCard
+        word={selection.word}
+        entry={selection.entry}
+        style={selection.style}
+        translation={selection.translation}
+      />
+    );
+  }
+
+  return null;
 }
