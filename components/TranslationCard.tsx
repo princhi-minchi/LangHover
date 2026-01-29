@@ -5,6 +5,7 @@ interface TranslationCardProps {
   word: string;
   entry: VerbEntry;
   style: React.CSSProperties;
+  translation?: string | null;
 }
 
 // 1. Define the order of tabs (Present -> Passato Prossimo -> Future -> Others)
@@ -21,21 +22,21 @@ const TENSE_MAP = [
 
 // 2. Hardcoded conjugations for auxiliaries (to build compound tenses)
 const AUX_CONJUGATIONS: Record<string, ConjugationSet> = {
-  avere: { 
-    io: 'ho', tu: 'hai', lui_lei: 'ha', 
-    noi: 'abbiamo', voi: 'avete', loro: 'hanno' 
+  avere: {
+    io: 'ho', tu: 'hai', lui_lei: 'ha',
+    noi: 'abbiamo', voi: 'avete', loro: 'hanno'
   },
-  essere: { 
-    io: 'sono', tu: 'sei', lui_lei: 'è', 
-    noi: 'siamo', voi: 'siete', loro: 'sono' 
+  essere: {
+    io: 'sono', tu: 'sei', lui_lei: 'è',
+    noi: 'siamo', voi: 'siete', loro: 'sono'
   }
 };
 
-export default function TranslationCard({ word, entry, style }: TranslationCardProps) {
+export default function TranslationCard({ word, entry, style, translation }: TranslationCardProps) {
   // Default to Present tense
   const [activeTab, setActiveTab] = useState<string>('present');
   const tabsRef = useRef<HTMLDivElement>(null);
-  
+
   const cleanWord = word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "");
 
   // Scroll logic for the arrows
@@ -54,9 +55,9 @@ export default function TranslationCard({ word, entry, style }: TranslationCardP
     const displayValue = value || '-';
     // Check match against the full value (e.g. "ho mangiato") or just the main word
     // We split by spaces to ensure "ha" doesn't match "hanno" (exact word match only)
-    const isMatch = displayValue.toLowerCase() === cleanWord || 
-                   displayValue.toLowerCase().split(' ').some(w => w === cleanWord);
-    
+    const isMatch = displayValue.toLowerCase() === cleanWord ||
+      displayValue.toLowerCase().split(' ').some(w => w === cleanWord);
+
     return (
       <div className="flex flex-col group cursor-default">
         <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-0.5 group-hover:text-indigo-400 transition-colors">
@@ -103,7 +104,7 @@ export default function TranslationCard({ word, entry, style }: TranslationCardP
   }
 
   return (
-    <div 
+    <div
       className="fixed z-50 w-72 bg-white rounded-xl shadow-2xl ring-1 ring-slate-900/10 overflow-hidden font-sans pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
       style={style}
     >
@@ -115,14 +116,20 @@ export default function TranslationCard({ word, entry, style }: TranslationCardP
             {entry.auxiliary ? 'aux: ' + entry.auxiliary : 'verb'}
           </span>
         </div>
-        <p className="text-sm text-slate-500 italic truncate">{entry.definition}</p>
+        <p className="text-sm text-slate-500 italic truncate">
+          {translation === undefined || translation === null ? (
+            <span className="opacity-50">Loading translation...</span>
+          ) : (
+            translation
+          )}
+        </p>
       </div>
 
       {/* Scrollable Tabs Container */}
       <div className="relative flex items-center bg-white border-b border-slate-100">
-        
+
         {/* Left Arrow */}
-        <button 
+        <button
           onClick={() => scrollTabs('left')}
           className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 z-10"
         >
@@ -130,7 +137,7 @@ export default function TranslationCard({ word, entry, style }: TranslationCardP
         </button>
 
         {/* Scroll Area (Hidden Scrollbar) */}
-        <div 
+        <div
           ref={tabsRef}
           className="flex-1 flex overflow-x-auto scrollbar-hide scroll-smooth no-scrollbar"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Hides scrollbar in Firefox/IE
@@ -141,8 +148,8 @@ export default function TranslationCard({ word, entry, style }: TranslationCardP
               onClick={() => setActiveTab(tense.key)}
               className={`
                 flex-none px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors
-                ${activeTab === tense.key 
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30' 
+                ${activeTab === tense.key
+                  ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
               `}
             >
@@ -152,7 +159,7 @@ export default function TranslationCard({ word, entry, style }: TranslationCardP
         </div>
 
         {/* Right Arrow */}
-        <button 
+        <button
           onClick={() => scrollTabs('right')}
           className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 z-10"
         >

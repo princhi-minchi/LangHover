@@ -2,13 +2,13 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import ExtensionOverlay from './components/ExtensionOverlay';
+import './index.css';
 
 const rootElement = document.getElementById('langhover-dev-root');
 
 if (rootElement) {
   // 1. DEV MODE (npm run dev)
   // Just render normally for testing
-  import('./index.css');
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
       <App />
