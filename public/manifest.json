@@ -4,13 +4,17 @@
   "version": "1.0",
   "description": "Instant Italian verb translations and conjugations on any webpage.",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["assets/index.js"]
-      // NO CSS HERE! We load it manually in index.tsx
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "assets/index.js"
+      ]
     }
   ],
   "action": {
@@ -19,8 +23,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["verbs.csv", "assets/index.css"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "verbs.csv",
+        "assets/index.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
