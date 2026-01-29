@@ -6,6 +6,8 @@ import { VerbEntry } from '../types';
 import TranslationCard from './TranslationCard';
 import PhraseOverlay from './PhraseOverlay';
 
+import nlp from 'compromise';
+
 export default function ExtensionOverlay() {
   const [verbData, setVerbData] = useState<Record<string, VerbEntry>>({});
   const [selection, setSelection] = useState<{
@@ -14,6 +16,7 @@ export default function ExtensionOverlay() {
     style: React.CSSProperties;
     translation?: string | null;
     isPhrase?: boolean;
+    highlightedWords?: string[];
   } | null>(null);
 
   // 1. Load Data Async & Settings
@@ -107,9 +110,25 @@ export default function ExtensionOverlay() {
 
           const translated = await translateText(text, target);
 
+          // VERB DETECTION LOGIC
+          let highlighted: string[] = [];
+          if (isPhrase && verbData) {
+            // Check if source text contains any verb from our database
+            // We split by standard delimiters to find independent words
+            const words = text.toLowerCase().split(/[\s.,;!?]+/);
+            const hasSourceVerb = words.some(w => Object.prototype.hasOwnProperty.call(verbData, w));
+
+            if (hasSourceVerb) {
+              // Use compromise to find verbs in the English translation
+              const doc = nlp(translated);
+              highlighted = doc.verbs().out('array');
+              console.log('Source verb detected. Highlighted English verbs:', highlighted);
+            }
+          }
+
           setSelection(prev => {
             if (prev && prev.word === text) {
-              return { ...prev, translation: translated };
+              return { ...prev, translation: translated, highlightedWords: highlighted };
             }
             return prev;
           });
@@ -143,6 +162,7 @@ export default function ExtensionOverlay() {
       <PhraseOverlay
         originalText={selection.word}
         translation={selection.translation || null}
+        highlightedWords={selection.highlightedWords}
         style={selection.style}
       />
     );

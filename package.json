@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.17",
+    "compromise": "^14.14.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
