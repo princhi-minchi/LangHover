@@ -3,12 +3,12 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import ExtensionOverlay from './components/ExtensionOverlay';
 
-const rootElement = document.getElementById('root');
+const rootElement = document.getElementById('langhover-dev-root');
 
 if (rootElement) {
   // 1. DEV MODE (npm run dev)
   // Just render normally for testing
-  import('./index.css'); 
+  import('./index.css');
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
       <App />
@@ -16,13 +16,13 @@ if (rootElement) {
   );
 } else {
   // 2. EXTENSION MODE (Real Website)
-  
+
   // Create the "Host" element (This sits in the real website)
   const host = document.createElement('div');
   host.id = 'langhover-extension-host';
   // Reset the host so it doesn't affect the page layout
   host.style.display = 'block';
-  host.style.all = 'initial'; 
+  host.style.all = 'initial';
   document.body.appendChild(host);
 
   // Create the "Shadow Root" (The invisible wall)
