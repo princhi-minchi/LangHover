@@ -17,6 +17,10 @@
       ]
     }
   ],
+  "host_permissions": [
+    "https://api.ultralingua.com/*",
+    "https://translation.googleapis.com/*"
+  ],
   "action": {
     "default_popup": "index.html",
     "default_title": "Italian Verb Settings"
@@ -24,7 +28,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "verbs.csv",
         "assets/index.css"
       ],
       "matches": [

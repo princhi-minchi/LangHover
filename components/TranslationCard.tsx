@@ -1,43 +1,91 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { VerbEntry, ConjugationSet } from '../types';
+import { TENSE_DISPLAY_NAMES } from '../utils/tenseMapping';
 
 interface TranslationCardProps {
   word: string;
   entry: VerbEntry;
   style: React.CSSProperties;
   translation?: string | null;
+  infinitiveTranslation?: string | null;
+  enabledTenses?: string[];
+  initialTense?: string;
 }
 
-// 1. Define the order of tabs (Present -> Passato Prossimo -> Future -> Others)
-const TENSE_MAP = [
-  { key: 'present', label: 'Present' },
-  { key: 'passatoProssimo', label: 'Passato Pros.' }, // New Tab
-  { key: 'future', label: 'Future' },
-  { key: 'imperfect', label: 'Imperfect' },
-  { key: 'pastRemote', label: 'Past Rem.' },
-  { key: 'conditional', label: 'Conditional' },
-  { key: 'subjunctivePresent', label: 'Subj. Pres.' },
-  { key: 'subjunctiveImperfect', label: 'Subj. Imp.' },
-] as const;
+interface ConjugationItemProps {
+  label: string;
+  value: string;
+  cleanWord: string;
+}
 
-// 2. Hardcoded conjugations for auxiliaries (to build compound tenses)
-const AUX_CONJUGATIONS: Record<string, ConjugationSet> = {
-  avere: {
-    io: 'ho', tu: 'hai', lui_lei: 'ha',
-    noi: 'abbiamo', voi: 'avete', loro: 'hanno'
-  },
-  essere: {
-    io: 'sono', tu: 'sei', lui_lei: 'è',
-    noi: 'siamo', voi: 'siete', loro: 'sono'
-  }
+const ConjugationItem: React.FC<ConjugationItemProps> = ({ label, value, cleanWord }) => {
+  const displayValue = value || '-';
+  const isMatch = displayValue.toLowerCase() === cleanWord ||
+    displayValue.toLowerCase().split(' ').some(w => w === cleanWord);
+
+  return (
+    <div className="flex flex-col group cursor-default">
+      <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-0.5 group-hover:text-indigo-400 transition-colors">
+        {label}
+      </span>
+      <span className={`text-sm leading-tight transition-all ${isMatch ? 'font-bold text-indigo-600 scale-105 origin-left' : 'text-slate-700'}`}>
+        {displayValue}
+      </span>
+    </div>
+  );
 };
 
-export default function TranslationCard({ word, entry, style, translation }: TranslationCardProps) {
-  // Default to Present tense
-  const [activeTab, setActiveTab] = useState<string>('present');
-  const tabsRef = useRef<HTMLDivElement>(null);
+export default function TranslationCard({ word, entry, style, translation, infinitiveTranslation, enabledTenses, initialTense }: TranslationCardProps) {
+  // Get available tenses from the entry
+  // Filter based on enabledTenses, but ALWAYS include the initialTense (temporary override)
+  // Get available tenses from the entry
+  // Filter based on enabledTenses, but ALWAYS include the initialTense (temporary override)
+  const availableTenses = useMemo(() => Object.keys(entry.tenses).filter(tense => {
+    // If it's the tense of the selected verb, always show it
+    if (initialTense && tense === initialTense) return true;
+    // Otherwise check if enabled (default to true if enabledTenses is undefined)
+    return enabledTenses ? enabledTenses.includes(tense) : true;
+  }), [entry.tenses, enabledTenses, initialTense]);
 
+  // Default to initialTense if available, otherwise 'present', otherwise first available
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (initialTense && availableTenses.includes(initialTense)) return initialTense;
+    if (availableTenses.includes('present')) return 'present';
+    return availableTenses[0] || '';
+  });
+
+  const tabsRef = useRef<HTMLDivElement>(null);
   const cleanWord = word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "");
+
+  // Update active tab if entry changes
+  useEffect(() => {
+    // If we have an explicit initialTense, switch to it
+    if (initialTense && availableTenses.includes(initialTense)) {
+      setActiveTab(initialTense);
+    } else if (!availableTenses.includes(activeTab) && availableTenses.length > 0) {
+      if (availableTenses.includes('present')) {
+        setActiveTab('present');
+      } else {
+        setActiveTab(availableTenses[0]);
+      }
+    }
+  }, [entry.infinitive, initialTense, availableTenses]);
+
+  // Auto-scroll logic for tabs to ensure active tab is visible
+  useEffect(() => {
+    if (tabsRef.current) {
+      const index = availableTenses.indexOf(activeTab);
+      if (index >= 0 && tabsRef.current.children[index]) {
+        const tabElement = tabsRef.current.children[index] as HTMLElement;
+        tabElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }
+    }
+  }, [activeTab, availableTenses]);
+
 
   // Scroll logic for the arrows
   const scrollTabs = (direction: 'left' | 'right') => {
@@ -50,58 +98,24 @@ export default function TranslationCard({ word, entry, style, translation }: Tra
     }
   };
 
-  const ConjugationItem = ({ label, value }: { label: string, value: string }) => {
-    // Safety check: sometimes data might be missing a field
-    const displayValue = value || '-';
-    // Check match against the full value (e.g. "ho mangiato") or just the main word
-    // We split by spaces to ensure "ha" doesn't match "hanno" (exact word match only)
-    const isMatch = displayValue.toLowerCase() === cleanWord ||
-      displayValue.toLowerCase().split(' ').some(w => w === cleanWord);
+  const currentConjugation: ConjugationSet | undefined = entry.tenses[activeTab];
 
-    return (
-      <div className="flex flex-col group cursor-default">
-        <span className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-0.5 group-hover:text-indigo-400 transition-colors">
-          {label}
-        </span>
-        <span className={`text-sm leading-tight transition-all ${isMatch ? 'font-bold text-indigo-600 scale-105 origin-left' : 'text-slate-700'}`}>
-          {displayValue}
-        </span>
-      </div>
-    );
+  // Format label using our mapping
+  const formatLabel = (key: string) => {
+    return TENSE_DISPLAY_NAMES[key] || key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
   };
 
-  // 3. LOGIC TO DETERMINE CONJUGATION DATA
-  let currentConjugation: ConjugationSet | null = null;
-
-  if (activeTab === 'passatoProssimo') {
-    // DYNAMICALLY BUILD PASSATO PROSSIMO
-    // 1. Identify auxiliary (default to avere if missing)
-    let auxKey = 'avere';
-    if (entry.auxiliary && entry.auxiliary.toLowerCase().includes('essere')) {
-      auxKey = 'essere';
-    }
-
-    // 2. Get the aux conjugation (ho, hai...)
-    const auxSet = AUX_CONJUGATIONS[auxKey];
-    const participle = entry.participle || '...';
-
-    // 3. Combine them: "ho" + "mangiato"
-    if (auxSet) {
-      currentConjugation = {
-        io: `${auxSet.io} ${participle}`,
-        tu: `${auxSet.tu} ${participle}`,
-        lui_lei: `${auxSet.lui_lei} ${participle}`,
-        noi: `${auxSet.noi} ${participle}`,
-        voi: `${auxSet.voi} ${participle}`,
-        loro: `${auxSet.loro} ${participle}`,
-      };
-    }
-  } else {
-    // STANDARD LOOKUP for simple tenses stored in the CSV
-    // We cast to "keyof typeof" because we know our TENSE_MAP keys match the Type keys (mostly)
-    // We ignore 'passatoProssimo' here because we handled it above
-    currentConjugation = entry.tenses[activeTab as keyof typeof entry.tenses] as ConjugationSet;
-  }
+  // Helper to order standard keys
+  const getOrderedKeys = (conj: ConjugationSet) => {
+    const standardOrder = ['io', 'tu', 'lui_lei', 'noi', 'voi', 'loro'];
+    const keys = Object.keys(conj);
+    const hasAllStandard = standardOrder.every(k => keys.includes(k));
+    if (hasAllStandard) return standardOrder;
+    return keys;
+  };
 
   return (
     <div
@@ -110,24 +124,32 @@ export default function TranslationCard({ word, entry, style, translation }: Tra
     >
       {/* Header */}
       <div className="px-4 pt-3 pb-2 bg-slate-50 border-b border-slate-100">
-        <div className="flex justify-between items-baseline">
-          <h3 className="font-bold text-lg text-slate-900 capitalize">{entry.infinitive}</h3>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 font-medium">
-            {entry.auxiliary ? 'aux: ' + entry.auxiliary : 'verb'}
-          </span>
+        <div className="flex justify-between items-baseline mb-1">
+          <h3 className="font-bold text-lg text-slate-900 capitalize flex items-center gap-2">
+            {word}
+            <span className="text-sm font-normal italic text-slate-500">
+              ({entry.infinitive})
+            </span>
+          </h3>
         </div>
-        <p className="text-sm text-slate-500 italic truncate">
+        <p className="text-sm text-slate-500 truncate flex items-center gap-2">
           {translation === undefined || translation === null ? (
             <span className="opacity-50">Loading translation...</span>
           ) : (
-            translation
+            <>
+              <span>{translation}</span>
+              {infinitiveTranslation && (
+                <span className="text-xs italic opacity-75">
+                  ({infinitiveTranslation})
+                </span>
+              )}
+            </>
           )}
         </p>
       </div>
 
       {/* Scrollable Tabs Container */}
       <div className="relative flex items-center bg-white border-b border-slate-100">
-
         {/* Left Arrow */}
         <button
           onClick={() => scrollTabs('left')}
@@ -136,24 +158,24 @@ export default function TranslationCard({ word, entry, style, translation }: Tra
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
 
-        {/* Scroll Area (Hidden Scrollbar) */}
+        {/* Scroll Area */}
         <div
           ref={tabsRef}
           className="flex-1 flex overflow-x-auto scrollbar-hide scroll-smooth no-scrollbar"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Hides scrollbar in Firefox/IE
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          {TENSE_MAP.map((tense) => (
+          {availableTenses.map((tenseKey) => (
             <button
-              key={tense.key}
-              onClick={() => setActiveTab(tense.key)}
+              key={tenseKey}
+              onClick={() => setActiveTab(tenseKey)}
               className={`
                 flex-none px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors
-                ${activeTab === tense.key
+                ${activeTab === tenseKey
                   ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
               `}
             >
-              {tense.label}
+              {formatLabel(tenseKey)}
             </button>
           ))}
         </div>
@@ -171,12 +193,9 @@ export default function TranslationCard({ word, entry, style, translation }: Tra
       <div className="px-4 py-3 bg-white h-[180px] overflow-y-auto">
         {currentConjugation ? (
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-            <ConjugationItem label="io" value={currentConjugation.io} />
-            <ConjugationItem label="tu" value={currentConjugation.tu} />
-            <ConjugationItem label="lui/lei" value={currentConjugation.lui_lei} />
-            <ConjugationItem label="noi" value={currentConjugation.noi} />
-            <ConjugationItem label="voi" value={currentConjugation.voi} />
-            <ConjugationItem label="loro" value={currentConjugation.loro} />
+            {getOrderedKeys(currentConjugation).map(key => (
+              <ConjugationItem key={key} label={key.replace('_', '/')} value={currentConjugation[key]} cleanWord={cleanWord} />
+            ))}
           </div>
         ) : (
           <div className="flex items-center justify-center h-full text-slate-400 text-xs italic">
