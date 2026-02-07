@@ -10,6 +10,10 @@ export const TENSE_DISPLAY_NAMES: Record<string, string> = {
     imperative: "Imperative",
     presentparticiple: "Present Participle", // Fix for "Presentparticiple"
     pastparticiple: "Past Participle",
+    'pastparticiplemasculinesingular': "Past Participle M/S",
+    'pastparticiplemasculineplural': "Past Participle M/P",
+    'pastparticiplefemininesingular': "Past Participle F/S",
+    'pastparticiplefeminineplural': "Past Participle F/P",
     passato_prossimo: "Passato Prossimo",
     trapassato_prossimo: "Trapassato Prossimo",
     trapassato_remoto: "Trapassato Remoto",
