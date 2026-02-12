@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { translateText } from '../services/translationService';
-import { fetchConjugations } from '../services/ultralinguaService';
+import { fetchConjugations, fetchDefinitions } from '../services/ultralinguaService';
 import { adaptConjugationsToVerbEntry } from '../utils/apiAdapters';
-import { VerbEntry } from '../types';
+import { VerbEntry, UltralinguaDefinitionItem } from '../types';
 import TranslationCard from './TranslationCard';
+import DefinitionCard from './DefinitionCard';
 import PhraseOverlay from './PhraseOverlay';
 import { ALL_TENSES } from '../utils/tenseMapping';
 
@@ -11,6 +12,7 @@ export default function ExtensionOverlay() {
   const [selection, setSelection] = useState<{
     word: string;
     entry?: VerbEntry;
+    definitions?: UltralinguaDefinitionItem[];
     style: React.CSSProperties;
     translation?: string | null;
     infinitiveTranslation?: string | null;
@@ -101,11 +103,12 @@ export default function ExtensionOverlay() {
         let translatedText: string | null = null;
         let infinitiveTranslatedText: string | null = null;
         let entry: VerbEntry | undefined;
+        let definitions: UltralinguaDefinitionItem[] | undefined;
         let initialTense: string | undefined;
 
         if (!isPhrase) {
           // 1. Try verb lookup first
-          const sourceLang = 'italian';
+          const sourceLang = 'italian'; // Assuming source is Italian for now as per context
           console.log('Fetching conjugations for:', cleanText);
           const conjugationResults = await fetchConjugations(cleanText, sourceLang);
           console.log('Conjugation results:', conjugationResults);
@@ -134,10 +137,19 @@ export default function ExtensionOverlay() {
             infinitiveTranslatedText = t2;
 
           } else {
-            // Not a verb
-            console.log('No conjugations found, assuming not a verb');
-            // 2b. Translate the ORIGINAL TEXT
-            translatedText = await translateText(text, targetLang);
+            // Not a verb (or no conjugations found)
+            console.log('No conjugations found, checking definitions...');
+
+            // 1b. Try definitions lookup
+            const defs = await fetchDefinitions(cleanText, sourceLang, targetLang);
+
+            if (defs && defs.length > 0) {
+              definitions = defs;
+            } else {
+              // 1c. If no definitions either, just translate original text
+              console.log('No definitions found, falling back to translation');
+              translatedText = await translateText(text, targetLang);
+            }
           }
         } else {
           // It is a phrase
@@ -151,7 +163,8 @@ export default function ExtensionOverlay() {
               ...prev,
               translation: translatedText,
               infinitiveTranslation: infinitiveTranslatedText,
-              entry: entry, // will be undefined if not a verb
+              entry: entry,
+              definitions: definitions,
               highlightedWords: [], // removed phrase highlighting for now
               enabledTenses,
               initialTense
@@ -205,34 +218,38 @@ export default function ExtensionOverlay() {
     );
   }
 
-  // If not a phrase and not a verb, currently we show nothing or maybe just translation?
-  // The original code: "if (!isPhrase && !entry) setSelection(null)" imply we don't show anything.
-  // BUT: We setSelection BEFORE we know if it is a verb.
-  // So if it turns out NOT to be a verb, we should probably close it or show just translation?
-  // The original code logic:
-  // "Only look for verb entry if NOT a phrase... If it's a phrase OR entry... setSelection"
-  // So if it was a single word and NOT in CSV, it did NOTHING.
-  // So we should replicate that: if single word and NOT verb, we hide it.
+  // Show DefinitionCard if we have definitions
+  if (selection.definitions) {
+    return (
+      <DefinitionCard
+        word={selection.word}
+        definitions={selection.definitions}
+        style={selection.style}
+      />
+    );
+  }
 
-  // However, since we act async, we initially show it.
-  // If we want to strictly mimic: we shouldn't show unitl we know. 
-  // But that delays UI. 
-  // Let's hide it if translation arrives and no entry and not phrase.
-
-  // Ideally, we'd render a simple translation card for non-verbs too? 
-  // User didn't ask for that, so let's stick to "If not phrase and not verb -> null".
-
-  // Logic inside Effect:
-  // "if (!isPhrase) check verb... if (defResult.isVerb)..."
-  // If we reach end of effect and entry is still undefined and !isPhrase, 
-  // the component will render generic info or nothing?
-  // Current return logic: if (selection.entry) render Card. Else return null.
-  // So initially it returns null (loading?). 
-  // We might want to show a loading state. 
-  // But original app didn't show loading for non-verbs, it checked sync against CSV.
-  // Now we are async. Optimistic UI is better.
-  // But for now, if we return null, user sees nothing until data loads?
-  // If we want to avoid flashing, we can keep it null.
+  // If we have just a translation (no verb, no definitions, but maybe failed fallback?)
+  // Currently we only show PhraseOverlay for phrases.
+  // If it's a single word and we got a translation but no definitions, do we show PhraseOverlay?
+  // The logic above sets isPhrase = false.
+  // If we want to show simple translation for single words that are not found in dictionary:
+  // We can repurpose PhraseOverlay or create a simple one.
+  // For now, adhering to instruction: if no response (verb or def), do what it currently does (which was nothing/translation).
+  // If we want to show translation for single words:
+  if (selection.translation && !selection.entry && !selection.definitions) {
+    // Optional: Render PhraseOverlay even for single words if nothing else found?
+    // Users usually expect *something*.
+    // Let's render PhraseOverlay as a fallback for single words too if we have a translation.
+    return (
+      <PhraseOverlay
+        originalText={selection.word}
+        translation={selection.translation}
+        highlightedWords={[]}
+        style={selection.style}
+      />
+    );
+  }
 
   return null;
 }

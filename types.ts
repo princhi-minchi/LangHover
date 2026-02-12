@@ -26,12 +26,16 @@ export interface UltralinguaResponseItem {
   conjugations: UltralinguaConjugation[];
 }
 
-export interface UltralinguaDefinition {
+export interface UltralinguaDefinitionItem {
+  root: string;
+  surfaceform: string;
+  partofspeech: {
+    partofspeechcategory: string;
+    tense?: string;
+    number?: string;
+  };
   text: string;
-  definitions: {
-    text: string;
-    partofspeech: {
-      partofspeechcategory: string;
-    };
-  }[];
+  clarification?: string[];
 }
+
+export type UltralinguaDefinitionResponse = UltralinguaDefinitionItem[];

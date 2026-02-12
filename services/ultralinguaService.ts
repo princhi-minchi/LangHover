@@ -1,4 +1,4 @@
-import { UltralinguaConjugation, UltralinguaDefinition, UltralinguaResponseItem } from '../types';
+import { UltralinguaConjugation, UltralinguaDefinitionItem, UltralinguaResponseItem } from '../types';
 
 const BASE_URL = 'https://api.ultralingua.com/api/2.0';
 const API_KEY = 'YTX7T94MM92LKZPN64W3P';
@@ -7,42 +7,26 @@ export const fetchDefinitions = async (
     word: string,
     sourceLang: string,
     targetLang: string
-): Promise<{ definition: string | null; isVerb: boolean }> => {
+): Promise<UltralinguaDefinitionItem[] | null> => {
     try {
         const url = `${BASE_URL}/definitions/${sourceLang}/${targetLang}/${encodeURIComponent(word)}?key=${API_KEY}`;
         const response = await fetch(url);
 
         if (!response.ok) {
             console.error(`Error fetching definitions: ${response.statusText}`);
-            return { definition: null, isVerb: false };
+            return null;
         }
 
-        const data: UltralinguaDefinition[] = await response.json();
+        const data: UltralinguaDefinitionItem[] = await response.json();
 
         if (!data || data.length === 0) {
-            return { definition: null, isVerb: false };
+            return null;
         }
 
-        // Find the first matching entry
-        const entry = data[0]; // The API might return multiple, we take the top one
-
-        if (!entry.definitions || entry.definitions.length === 0) {
-            return { definition: null, isVerb: false };
-        }
-
-        const firstDef = entry.definitions[0];
-
-        const isVerb = entry.definitions.some(
-            (def) => def.partofspeech?.partofspeechcategory?.toLowerCase() === 'verb'
-        );
-
-        return {
-            definition: firstDef ? firstDef.text : null,
-            isVerb,
-        };
+        return data;
     } catch (error) {
         console.error('Failed to fetch definitions:', error);
-        return { definition: null, isVerb: false };
+        return null;
     }
 };
 
