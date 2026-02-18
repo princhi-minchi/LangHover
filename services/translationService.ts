@@ -1,6 +1,18 @@
+const BASE_URL = 'https://gube-proxy.raunaksbs.workers.dev/api';
 
-const API_KEY = 'AIzaSyAdaRZPE_d-ZRDuESraHRMwtmgF-Wti56s';
-const BASE_URL = 'https://translation.googleapis.com/language/translate/v2';
+// Helper: Generates or retrieves a unique User ID from Chrome Storage
+const getUserId = async (): Promise<string> => {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['gubeUserId'], (result) => {
+            if (result.gubeUserId) {
+                resolve(result.gubeUserId as string);
+            } else {
+                const newId = crypto.randomUUID();
+                chrome.storage.local.set({ gubeUserId: newId }, () => resolve(newId));
+            }
+        });
+    });
+};
 
 export interface TranslationResponse {
     data: {
@@ -13,14 +25,13 @@ export interface TranslationResponse {
 
 export const translateText = async (text: string, targetLang: string = 'en'): Promise<string> => {
     try {
-        const url = `${BASE_URL}?key=${API_KEY}&q=${encodeURIComponent(text)}&target=${targetLang}`;
+        const userId = await getUserId();
 
-        // Google API requires POST for larger queries, but GET works for single words/short phrases.
-        // We'll use POST to be safe and standard.
-        const response = await fetch(`${BASE_URL}?key=${API_KEY}`, {
+        const response = await fetch(`${BASE_URL}/translate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'x-user-id': userId // Sending the ID to our rate limiter!
             },
             body: JSON.stringify({
                 q: text,
@@ -29,9 +40,12 @@ export const translateText = async (text: string, targetLang: string = 'en'): Pr
             })
         });
 
+        // Handle our new Rate Limiter gracefully
+        if (response.status === 429) {
+            return 'Free daily limit reached! Come back tomorrow.';
+        }
+
         if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Translation API Error:', errorData);
             throw new Error(`Translation failed: ${response.statusText}`);
         }
 
