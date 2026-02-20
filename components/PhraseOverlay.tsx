@@ -3,11 +3,10 @@ import React from 'react';
 interface PhraseOverlayProps {
     originalText: string;
     translation: string | null;
-    style: React.CSSProperties;
     highlightedWords?: string[];
 }
 
-export default function PhraseOverlay({ originalText, translation, style, highlightedWords }: PhraseOverlayProps) {
+export default function PhraseOverlay({ originalText, translation, highlightedWords }: PhraseOverlayProps) {
     const renderTranslation = () => {
         if (!translation) return <span className="animate-pulse text-slate-400">Translating...</span>;
         if (translation === 'Error') return "Error loading translation";
@@ -47,8 +46,7 @@ export default function PhraseOverlay({ originalText, translation, style, highli
 
     return (
         <div
-            className="fixed z-50 max-w-md bg-white/90 backdrop-blur-md rounded-xl shadow-2xl ring-1 ring-slate-900/10 overflow-hidden font-sans pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
-            style={style}
+            className="max-w-md bg-white/90 backdrop-blur-md rounded-xl shadow-2xl ring-1 ring-slate-900/10 overflow-hidden font-sans pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
         >
             <div className="px-4 py-3">
                 <div className="flex flex-col gap-2">

@@ -15,7 +15,6 @@ const PARTICIPLE_KEYS = [
 interface TranslationCardProps {
   word: string;
   entry: VerbEntry;
-  style: React.CSSProperties;
   translation?: string | null;
   infinitiveTranslation?: string | null;
   enabledTenses?: string[];
@@ -45,7 +44,7 @@ const ConjugationItem: React.FC<ConjugationItemProps> = ({ label, value, cleanWo
   );
 };
 
-export default function TranslationCard({ word, entry, style, translation, infinitiveTranslation, enabledTenses, initialTense }: TranslationCardProps) {
+export default function TranslationCard({ word, entry, translation, infinitiveTranslation, enabledTenses, initialTense }: TranslationCardProps) {
   // Determine effective initial tense (mapping participles to the group)
   const effectiveInitialTense = useMemo(() => {
     if (initialTense && PARTICIPLE_KEYS.includes(initialTense)) {
@@ -187,8 +186,7 @@ export default function TranslationCard({ word, entry, style, translation, infin
 
   return (
     <div
-      className="fixed z-50 w-72 bg-white rounded-xl shadow-2xl ring-1 ring-slate-900/10 overflow-hidden font-sans pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
-      style={style}
+      className="w-72 bg-white rounded-xl shadow-2xl ring-1 ring-slate-900/10 overflow-hidden font-sans pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
     >
       {/* Header */}
       <div className="px-4 pt-3 pb-2 bg-slate-50 border-b border-slate-100">

@@ -4,14 +4,12 @@ import { UltralinguaDefinitionItem } from '../types';
 interface DefinitionCardProps {
     word: string;
     definitions: UltralinguaDefinitionItem[];
-    style: React.CSSProperties;
 }
 
-export default function DefinitionCard({ word, definitions, style }: DefinitionCardProps) {
+export default function DefinitionCard({ word, definitions }: DefinitionCardProps) {
     return (
         <div
-            className="fixed z-50 w-80 bg-white rounded-xl shadow-2xl ring-1 ring-slate-900/10 overflow-hidden font-sans pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
-            style={style}
+            className="w-80 bg-white rounded-xl shadow-2xl ring-1 ring-slate-900/10 overflow-hidden font-sans pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
         >
             {/* Header */}
             <div className="px-4 pt-3 pb-2 bg-slate-50 border-b border-slate-100">
