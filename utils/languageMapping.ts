@@ -10,7 +10,8 @@ export const SUPPORTED_LANGUAGES: Record<string, LanguageInfo> = {
     'fr': { isoCode: 'fr', ultralinguaName: 'french', displayName: 'French' },
     'de': { isoCode: 'de', ultralinguaName: 'german', displayName: 'German' },
     'it': { isoCode: 'it', ultralinguaName: 'italian', displayName: 'Italian' },
-    'pt': { isoCode: 'pt', ultralinguaName: 'portuguese', displayName: 'Portuguese' },
+    'pt': { isoCode: 'pt', ultralinguaName: 'portuguese', displayName: 'Portuguese (European)' },
+    'pt-BR': { isoCode: 'pt-BR', ultralinguaName: 'portuguese', displayName: 'Portuguese (Brazilian)' },
     'nl': { isoCode: 'nl', ultralinguaName: 'dutch', displayName: 'Dutch' },
     // 'ru': { isoCode: 'ru', ultralinguaName: 'russian', displayName: 'Russian' }, // Russian conjugations might be unreliable, but keeping it if supported
     // 'la': { isoCode: 'la', ultralinguaName: 'latin', displayName: 'Latin' },

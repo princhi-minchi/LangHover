@@ -16,7 +16,6 @@ interface TranslationCardProps {
   word: string;
   entry: VerbEntry;
   translation?: string | null;
-  infinitiveTranslation?: string | null;
   enabledTenses?: string[];
   initialTense?: string;
 }
@@ -44,7 +43,7 @@ const ConjugationItem: React.FC<ConjugationItemProps> = ({ label, value, cleanWo
   );
 };
 
-export default function TranslationCard({ word, entry, translation, infinitiveTranslation, enabledTenses, initialTense }: TranslationCardProps) {
+export default function TranslationCard({ word, entry, translation, enabledTenses, initialTense }: TranslationCardProps) {
   // Determine effective initial tense (mapping participles to the group)
   const effectiveInitialTense = useMemo(() => {
     if (initialTense && PARTICIPLE_KEYS.includes(initialTense)) {
@@ -204,11 +203,6 @@ export default function TranslationCard({ word, entry, translation, infinitiveTr
           ) : (
             <>
               <span>{translation}</span>
-              {infinitiveTranslation && (
-                <span className="text-xs italic opacity-75">
-                  ({infinitiveTranslation})
-                </span>
-              )}
             </>
           )}
         </p>

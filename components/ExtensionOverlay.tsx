@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { translateText } from '../services/translationService';
-import { fetchConjugations, fetchDefinitions } from '../services/ultralinguaService';
+import { translateText, translateWithDeepL } from '../services/translationService';
+import { fetchConjugations } from '../services/ultralinguaService';
 import { adaptConjugationsToVerbEntry } from '../utils/apiAdapters';
-import { VerbEntry, UltralinguaDefinitionItem } from '../types';
+import { VerbEntry } from '../types';
 import TranslationCard from './TranslationCard';
 import DefinitionCard from './DefinitionCard';
 import PhraseOverlay from './PhraseOverlay';
@@ -12,11 +12,10 @@ import { SUPPORTED_LANGUAGES, DEFAULT_SOURCE_LANG, DEFAULT_TARGET_LANG } from '.
 export default function ExtensionOverlay() {
   const [selection, setSelection] = useState<{
     word: string;
+    contextText?: string;
     entry?: VerbEntry;
-    definitions?: UltralinguaDefinitionItem[];
     style: React.CSSProperties;
     translation?: string | null;
-    infinitiveTranslation?: string | null;
     isPhrase?: boolean;
     highlightedWords?: string[];
     enabledTenses?: string[];
@@ -36,12 +35,27 @@ export default function ExtensionOverlay() {
     let tenses = ALL_TENSES;
 
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      const result = await new Promise<{ sourceLang?: string; targetLang?: string; enabledTenses?: string[] }>(resolve =>
-        chrome.storage.local.get(['sourceLang', 'targetLang', 'enabledTenses'], (items) => resolve(items as { sourceLang?: string; targetLang?: string; enabledTenses?: string[] }))
-      );
-      if (result.sourceLang) source = result.sourceLang;
-      if (result.targetLang) target = result.targetLang;
-      if (result.enabledTenses) tenses = result.enabledTenses;
+      try {
+        const result = await new Promise<{ sourceLang?: string; targetLang?: string; enabledTenses?: string[] }>((resolve, reject) => {
+          chrome.storage.local.get(['sourceLang', 'targetLang', 'enabledTenses'], (items) => {
+            if (chrome.runtime.lastError) {
+              return reject(chrome.runtime.lastError);
+            }
+            resolve(items as { sourceLang?: string; targetLang?: string; enabledTenses?: string[] });
+          });
+        });
+        if (result.sourceLang) source = result.sourceLang;
+        if (result.targetLang) target = result.targetLang;
+        if (result.enabledTenses) tenses = result.enabledTenses;
+      } catch (e) {
+        console.warn('Chrome storage failed, falling back to localStorage:', e);
+        const savedSource = localStorage.getItem('sourceLang');
+        const savedTarget = localStorage.getItem('targetLang');
+        const savedTenses = localStorage.getItem('enabledTenses');
+        if (savedSource) source = savedSource;
+        if (savedTarget) target = savedTarget;
+        if (savedTenses) tenses = JSON.parse(savedTenses);
+      }
     } else {
       const savedSource = localStorage.getItem('sourceLang');
       const savedTarget = localStorage.getItem('targetLang');
@@ -61,25 +75,33 @@ export default function ExtensionOverlay() {
     setSourceLang(newSource);
     setTargetLang(newTarget);
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ sourceLang: newSource, targetLang: newTarget });
+      try {
+        chrome.storage.local.set({ sourceLang: newSource, targetLang: newTarget }, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('Chrome storage set failed:', chrome.runtime.lastError);
+          }
+        });
+      } catch (e) {
+        console.warn('Chrome storage threw error, falling back to localStorage:', e);
+        localStorage.setItem('sourceLang', newSource);
+        localStorage.setItem('targetLang', newTarget);
+      }
     } else {
       localStorage.setItem('sourceLang', newSource);
       localStorage.setItem('targetLang', newTarget);
     }
   };
 
-  const loadTranslationData = async (text: string, isPhrase: boolean, cleanText: string, style: React.CSSProperties, currentSource: string = sourceLang, currentTarget: string = targetLang) => {
+  const loadTranslationData = async (text: string, isPhrase: boolean, cleanText: string, style: React.CSSProperties, contextText?: string, currentSource: string = sourceLang, currentTarget: string = targetLang) => {
     setIsLoading(true);
 
     try {
       let translatedText: string | null = null;
-      let infinitiveTranslatedText: string | null = null;
       let entry: VerbEntry | undefined;
-      let definitions: UltralinguaDefinitionItem[] | undefined;
       let initialTense: string | undefined;
 
       const sourceUltralingua = SUPPORTED_LANGUAGES[currentSource]?.ultralinguaName || SUPPORTED_LANGUAGES[DEFAULT_SOURCE_LANG].ultralinguaName;
-      const targetUltralingua = SUPPORTED_LANGUAGES[currentTarget]?.ultralinguaName || SUPPORTED_LANGUAGES[DEFAULT_TARGET_LANG].ultralinguaName;
+      const sourceGoogle = SUPPORTED_LANGUAGES[currentSource]?.isoCode || DEFAULT_SOURCE_LANG;
       const targetGoogle = SUPPORTED_LANGUAGES[currentTarget]?.isoCode || DEFAULT_TARGET_LANG;
 
       if (!isPhrase) {
@@ -101,25 +123,13 @@ export default function ExtensionOverlay() {
             }
           }
 
-          // 2. Fetch BOTH translations
-          const p1 = translateText(text, targetGoogle);
-          const p2 = translateText(bestMatch.infinitive, targetGoogle);
-
-          const [t1, t2] = await Promise.all([p1, p2]);
-          translatedText = t1;
-          infinitiveTranslatedText = t2;
+          // 2. Fetch translation
+          translatedText = await translateWithDeepL(text, sourceGoogle, targetGoogle, contextText);
 
         } else {
           // Not a verb (or no conjugations found)
-          console.log('No conjugations found, checking definitions...');
-          const defs = await fetchDefinitions(cleanText, sourceUltralingua, targetUltralingua);
-
-          if (defs && defs.length > 0) {
-            definitions = defs;
-          } else {
-            console.log('No definitions found, falling back to translation');
-            translatedText = await translateText(text, targetGoogle);
-          }
+          console.log('No conjugations found, fetching DeepL translation...');
+          translatedText = await translateWithDeepL(text, sourceGoogle, targetGoogle, contextText);
         }
       } else {
         // It is a phrase
@@ -131,9 +141,7 @@ export default function ExtensionOverlay() {
           return {
             ...prev,
             translation: translatedText,
-            infinitiveTranslation: infinitiveTranslatedText,
             entry: entry,
-            definitions: definitions,
             highlightedWords: [], // removed phrase highlighting for now
             enabledTenses,
             initialTense
@@ -178,6 +186,33 @@ export default function ExtensionOverlay() {
       // Check if it's a phrase (more than one word)
       const isPhrase = text.includes(' ');
 
+      // Extract Context for single words
+      let contextText: string | undefined = undefined;
+      if (!isPhrase && selectionObj.anchorNode && selectionObj.anchorNode.nodeType === Node.TEXT_NODE) {
+        const textContent = selectionObj.anchorNode.textContent || '';
+        const start = Math.min(selectionObj.anchorOffset, selectionObj.focusOffset);
+        const end = Math.max(selectionObj.anchorOffset, selectionObj.focusOffset);
+
+        // Find sentence boundaries (look backwards/forwards for punctuation)
+        let sentenceStart = start;
+        while (sentenceStart > 0 && !/[.!?\n]/.test(textContent[sentenceStart - 1])) {
+          sentenceStart--;
+        }
+
+        let sentenceEnd = end;
+        while (sentenceEnd < textContent.length && !/[.!?\n]/.test(textContent[sentenceEnd])) {
+          sentenceEnd++;
+        }
+        if (sentenceEnd < textContent.length && /[.!?]/.test(textContent[sentenceEnd])) {
+          sentenceEnd++;
+        }
+
+        const extracted = textContent.slice(sentenceStart, sentenceEnd).trim();
+        if (extracted.length > text.length) {
+          contextText = extracted;
+        }
+      }
+
       // Determine clean text for verb lookup
       const cleanText = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "");
 
@@ -211,17 +246,17 @@ export default function ExtensionOverlay() {
       // Initial State
       setSelection({
         word: text,
+        contextText,
         style,
         translation: null,
-        isPhrase,
-        infinitiveTranslation: null
+        isPhrase
       });
 
       // Refetch settings to ensure we have the latest before loading data
       const settings = await getSettings();
 
       // Load Data
-      loadTranslationData(text, isPhrase, cleanText, style, settings.sourceLang, settings.targetLang);
+      loadTranslationData(text, isPhrase, cleanText, style, contextText, settings.sourceLang, settings.targetLang);
     };
 
     document.addEventListener('mouseup', handleGlobalSelection);
@@ -239,7 +274,7 @@ export default function ExtensionOverlay() {
     saveLanguageSettings(newSource, targetLang);
     if (selection) {
       const cleanText = selection.word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "");
-      loadTranslationData(selection.word, selection.isPhrase || false, cleanText, selection.style, newSource, targetLang);
+      loadTranslationData(selection.word, selection.isPhrase || false, cleanText, selection.style, selection.contextText, newSource, targetLang);
     }
   };
 
@@ -248,7 +283,7 @@ export default function ExtensionOverlay() {
     saveLanguageSettings(sourceLang, newTarget);
     if (selection) {
       const cleanText = selection.word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "");
-      loadTranslationData(selection.word, selection.isPhrase || false, cleanText, selection.style, sourceLang, newTarget);
+      loadTranslationData(selection.word, selection.isPhrase || false, cleanText, selection.style, selection.contextText, sourceLang, newTarget);
     }
   };
 
@@ -268,24 +303,15 @@ export default function ExtensionOverlay() {
         word={selection.word}
         entry={selection.entry}
         translation={selection.translation}
-        infinitiveTranslation={selection.infinitiveTranslation}
         enabledTenses={selection.enabledTenses}
         initialTense={selection.initialTense}
       />
     );
-  } else if (selection.definitions) {
+  } else if (selection.translation && !selection.entry && !selection.isPhrase) {
     innerCard = (
       <DefinitionCard
         word={selection.word}
-        definitions={selection.definitions}
-      />
-    );
-  } else if (selection.translation && !selection.entry && !selection.definitions) {
-    innerCard = (
-      <PhraseOverlay
-        originalText={selection.word}
         translation={selection.translation}
-        highlightedWords={[]}
       />
     );
   }
