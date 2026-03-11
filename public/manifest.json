@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Italian Verb Conjugator",
+  "name": "ConjuMate",
   "version": "1.0",
   "description": "Instant Italian verb translations and conjugations on any webpage.",
   "permissions": [
@@ -23,12 +23,13 @@
   ],
   "action": {
     "default_popup": "index.html",
-    "default_title": "Italian Verb Settings"
+    "default_title": "ConjuMate"
   },
   "web_accessible_resources": [
     {
       "resources": [
-        "assets/index.css"
+        "assets/*",
+        "index.html"
       ],
       "matches": [
         "<all_urls>"
