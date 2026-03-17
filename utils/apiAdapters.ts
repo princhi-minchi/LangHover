@@ -47,7 +47,9 @@ export const adaptConjugationsToVerbEntry = (
             val = String(val);
         }
 
-        tenses[tenseName][key] = val;
+        if (tenses[tenseName][key] === undefined) {
+            tenses[tenseName][key] = val;
+        }
     });
 
     // Extract participle if present in any of the items? 
