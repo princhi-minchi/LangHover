@@ -1,21 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { ALL_TENSES, TENSE_DISPLAY_NAMES } from '../utils/tenseMapping';
-import { SUPPORTED_LANGUAGES } from '../utils/languageMapping';
+import { SUPPORTED_LANGUAGES, DEFAULT_SOURCE_LANGUAGE, DEFAULT_TARGET_LANGUAGE } from '../utils/languageConfig';
+import { getAllLanguages } from '../utils/languageConfig';
 
-const LANGUAGES = Object.entries(SUPPORTED_LANGUAGES).map(([code, lang]) => ({
-    code: code,
-    name: lang.displayName
+const LANGUAGES = getAllLanguages().map((lang) => ({
+    code: lang.code,
+    name: lang.displayName,
+    isSupported: lang.isSupported
 }));
 
 export default function Settings() {
-    const [targetLang, setTargetLang] = useState('en');
+    const [sourceLang, setSourceLang] = useState(DEFAULT_SOURCE_LANGUAGE);
+    const [targetLang, setTargetLang] = useState(DEFAULT_TARGET_LANGUAGE);
     const [enabledTenses, setEnabledTenses] = useState<string[]>(ALL_TENSES);
     const [status, setStatus] = useState('');
 
     useEffect(() => {
-        // Load saved setting
+        // Load saved settings
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            chrome.storage.local.get(['targetLang', 'enabledTenses'], (result) => {
+            chrome.storage.local.get(['sourceLang', 'targetLang', 'enabledTenses'], (result) => {
+                if (result.sourceLang) {
+                    setSourceLang(result.sourceLang);
+                }
                 if (result.targetLang) {
                     setTargetLang(result.targetLang);
                 }
@@ -25,21 +31,24 @@ export default function Settings() {
             });
         } else {
             // Fallback for dev mode
-            const savedLang = localStorage.getItem('targetLang');
+            const savedSourceLang = localStorage.getItem('sourceLang');
+            const savedTargetLang = localStorage.getItem('targetLang');
             const savedTenses = localStorage.getItem('enabledTenses');
-            if (savedLang) setTargetLang(savedLang);
+            if (savedSourceLang) setSourceLang(savedSourceLang);
+            if (savedTargetLang) setTargetLang(savedTargetLang);
             if (savedTenses) setEnabledTenses(JSON.parse(savedTenses));
         }
     }, []);
 
     const handleSave = () => {
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            chrome.storage.local.set({ targetLang, enabledTenses }, () => {
+            chrome.storage.local.set({ sourceLang, targetLang, enabledTenses }, () => {
                 setStatus('Options saved.');
                 setTimeout(() => setStatus(''), 2000);
             });
         } else {
             // Fallback for dev mode
+            localStorage.setItem('sourceLang', sourceLang);
             localStorage.setItem('targetLang', targetLang);
             localStorage.setItem('enabledTenses', JSON.stringify(enabledTenses));
             setStatus('Options saved (Dev Mode).');
@@ -65,14 +74,39 @@ export default function Settings() {
 
     return (
         <div className="p-4 w-96 bg-white max-h-[600px] overflow-y-auto">
-            <h1 className="text-xl font-bold mb-4 text-slate-800">Italian Verb Settings</h1>
+            <h1 className="text-xl font-bold mb-4 text-slate-800">Language Settings</h1>
 
             <div className="mb-6">
-                <label htmlFor="language" className="block text-sm font-medium text-slate-700 mb-1">
+                <label htmlFor="sourceLanguage" className="block text-sm font-medium text-slate-700 mb-1">
+                    Source Language
+                </label>
+                <select
+                    id="sourceLanguage"
+                    value={sourceLang}
+                    onChange={(e) => setSourceLang(e.target.value)}
+                    className="block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                >
+                    {LANGUAGES.map((lang) => (
+                        <option 
+                            key={lang.code} 
+                            value={lang.code}
+                            disabled={!lang.isSupported}
+                        >
+                            {lang.name} {!lang.isSupported && '(Coming Soon)'}
+                        </option>
+                    ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                    Select the language of the text you're selecting.
+                </p>
+            </div>
+
+            <div className="mb-6">
+                <label htmlFor="targetLanguage" className="block text-sm font-medium text-slate-700 mb-1">
                     Target Language
                 </label>
                 <select
-                    id="language"
+                    id="targetLanguage"
                     value={targetLang}
                     onChange={(e) => setTargetLang(e.target.value)}
                     className="block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"

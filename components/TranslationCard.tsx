@@ -1,239 +1,184 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { VerbEntry, ConjugationSet } from '../types';
-import { TENSE_DISPLAY_NAMES } from '../utils/tenseMapping';
-
-const PARTICIPLE_KEYS = [
-  'presentparticiple',
-  'gerund',
-  'pastparticiple',
-  'pastparticiplemasculinesingular',
-  'pastparticiplemasculineplural',
-  'pastparticiplefemininesingular',
-  'pastparticiplefeminineplural'
-];
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ConjugationLookupResponse } from '../types';
 
 interface TranslationCardProps {
   word: string;
-  entry: VerbEntry;
-  translation?: string | null;
-  enabledTenses?: string[];
-  initialTense?: string;
-  darkMode?: boolean;
+  response: ConjugationLookupResponse;
+  style: React.CSSProperties;
+  wordTranslation?: string;
+  infinitiveTranslation?: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
 }
 
-interface ConjugationItemProps {
-  label: string;
-  value: string;
-  cleanWord: string;
-  darkMode?: boolean;
-}
+export default function TranslationCard({ 
+  word, 
+  response, 
+  style, 
+  wordTranslation, 
+  infinitiveTranslation,
+  sourceLanguage,
+  targetLanguage
+}: TranslationCardProps) {
+  const { entry, initialMatch, alternatives } = response;
+  
+  // 1. Memoize initial indices - MUST be before any conditional returns
+  const initialIndices = useMemo(() => {
+    if (!entry) return { presetMoodIdx: 0, presetTenseIdx: 0, moodIdx: -1 };
+    
+    const moodIdx = entry.groups.findIndex(g => g.moodKey === initialMatch?.moodKey);
+    const presetMoodIdx = moodIdx !== -1 ? moodIdx : 0;
+    
+    const tenseIdx = entry.groups[presetMoodIdx]?.tenses.findIndex(t => t.tenseKey === initialMatch?.tenseKey);
+    const presetTenseIdx = tenseIdx !== -1 ? tenseIdx : 0;
+    
+    return { presetMoodIdx, presetTenseIdx, moodIdx };
+  }, [entry?.groups, initialMatch?.moodKey, initialMatch?.tenseKey]);
 
-const ConjugationItem: React.FC<ConjugationItemProps> = ({ label, value, cleanWord, darkMode }) => {
-  const displayValue = value || '-';
-  const isMatch = displayValue.toLowerCase() === cleanWord ||
-    displayValue.toLowerCase().split(' ').some(w => w === cleanWord);
+  const [currentMoodIdx, setCurrentMoodIdx] = useState(initialIndices.presetMoodIdx);
+  const [currentTenseIdx, setCurrentTenseIdx] = useState(initialIndices.presetTenseIdx);
 
-  return (
-    <div className="flex flex-col group cursor-default">
-      <span className={`text-[10px] uppercase tracking-widest font-semibold mb-0.5 transition-colors ${darkMode
-        ? 'text-slate-500 group-hover:text-indigo-400'
-        : 'text-slate-400 group-hover:text-indigo-400'}`}>
-        {label}
-      </span>
-      <span className={`text-sm leading-tight transition-all ${isMatch
-        ? `font-bold scale-105 origin-left ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`
-        : darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-        {displayValue}
-      </span>
+  // Reset tense if mood changes
+  useEffect(() => {
+    if (currentMoodIdx !== initialIndices.moodIdx) {
+      setCurrentTenseIdx(0);
+    } else {
+      setCurrentTenseIdx(initialIndices.presetTenseIdx);
+    }
+  }, [currentMoodIdx, initialIndices.moodIdx, initialIndices.presetTenseIdx]);
+
+  const mood = entry?.groups[currentMoodIdx];
+  const tense = mood?.tenses[currentTenseIdx];
+  
+  const forms = tense?.forms || [];
+
+  // 2. Memoize navigation functions
+  const nextMood = useCallback(() => {
+    if (!entry) return;
+    setCurrentMoodIdx((prev) => (prev + 1) % entry.groups.length);
+  }, [entry?.groups.length]);
+
+  const prevMood = useCallback(() => {
+    if (!entry) return;
+    setCurrentMoodIdx((prev) => (prev - 1 + entry.groups.length) % entry.groups.length);
+  }, [entry?.groups.length]);
+
+  const nextTense = useCallback(() => {
+    if (!mood) return;
+    setCurrentTenseIdx((prev) => (prev + 1) % (mood.tenses.length || 1));
+  }, [mood?.tenses.length]);
+
+  const prevTense = useCallback(() => {
+    if (!mood) return;
+    setCurrentTenseIdx((prev) => (prev - 1 + (mood.tenses.length || 1)) % (mood.tenses.length || 1));
+  }, [mood?.tenses.length]);
+
+  // 3. Memoize cleanWord
+  const cleanWord = useMemo(() => 
+    word ? word.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'\[\]]/g, "") : ""
+  , [word]);
+
+  const ConjugationItem = useCallback(({ value }: { value?: string }) => {
+    if (!value) return <div className="py-0.5 text-slate-300 italic text-xs">...</div>;
+
+    const isInitialMatch = initialMatch && 
+                           mood?.moodKey === initialMatch.moodKey && 
+                           tense?.tenseKey === initialMatch.tenseKey &&
+                           value === initialMatch.storedForm;
+    
+    const isVisualMatch = cleanWord ? value.toLowerCase().includes(cleanWord) : false;
+    const isMatch = isInitialMatch || isVisualMatch;
+
+    return (
+      <div className="flex items-center group py-0.5">
+        <span className={`text-[14px] tracking-tight transition-all ${isMatch ? 'font-bold text-indigo-600 underline decoration-indigo-200 underline-offset-[4px] decoration-1' : 'text-slate-700 font-medium group-hover:text-slate-900'}`}>
+          {value}
+        </span>
+      </div>
+    );
+  }, [initialMatch, mood?.moodKey, tense?.tenseKey, cleanWord]);
+
+  // Early return after hooks
+  if (!entry || !mood || !tense) return null;
+
+  const NavRow = ({ label, onPrev, onNext, canNav }: { label: string, onPrev: () => void, onNext: () => void, canNav: boolean }) => (
+    <div className="flex items-center justify-between px-5 py-1 border-b border-slate-100 bg-white">
+      <button 
+        onClick={onPrev}
+        disabled={!canNav}
+        className={`p-1 rounded-full transition-all ${canNav ? 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 active:scale-95' : 'text-slate-200 cursor-not-allowed'}`}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+      </button>
+      <span className="text-slate-900 font-bold tracking-tight text-[11px] uppercase px-3 py-0.5 bg-slate-50/50 rounded-lg min-w-[110px] text-center border border-slate-100/30">{label}</span>
+      <button 
+        onClick={onNext}
+        disabled={!canNav}
+        className={`p-1 rounded-full transition-all ${canNav ? 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 active:scale-95' : 'text-slate-200 cursor-not-allowed'}`}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+      </button>
     </div>
   );
-};
-
-export default function TranslationCard({ word, entry, translation, enabledTenses, initialTense, darkMode }: TranslationCardProps) {
-  // Determine effective initial tense (mapping participles to the group)
-  const effectiveInitialTense = useMemo(() => {
-    if (initialTense && PARTICIPLE_KEYS.includes(initialTense)) {
-      return 'Participles';
-    }
-    return initialTense;
-  }, [initialTense]);
-
-  const availableTenses = useMemo(() => {
-    let tenses = Object.keys(entry.tenses).filter(tense => {
-      if (PARTICIPLE_KEYS.includes(tense)) return false;
-      const isEnabled = enabledTenses ? enabledTenses.includes(tense) : true;
-      if (initialTense && tense === initialTense) return true;
-      return isEnabled;
-    });
-
-    const hasParticiples = PARTICIPLE_KEYS.some(key => entry.tenses[key]);
-    if (hasParticiples) {
-      return ['Participles', ...tenses];
-    }
-
-    return tenses;
-  }, [entry.tenses, enabledTenses, initialTense]);
-
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    if (effectiveInitialTense && availableTenses.includes(effectiveInitialTense)) return effectiveInitialTense;
-    if (availableTenses.includes('present')) return 'present';
-    return availableTenses[0] || '';
-  });
-
-  const tabsRef = useRef<HTMLDivElement>(null);
-  const cleanWord = word.toLowerCase().replace(/[.,\/#!$%\^\&\*;:{}=\-_`~()?\"'\[\]]/g, "");
-
-  useEffect(() => {
-    if (effectiveInitialTense && availableTenses.includes(effectiveInitialTense)) {
-      setActiveTab(effectiveInitialTense);
-    } else if (!availableTenses.includes(activeTab) && availableTenses.length > 0) {
-      if (availableTenses.includes('present')) {
-        setActiveTab('present');
-      } else {
-        setActiveTab(availableTenses[0]);
-      }
-    }
-  }, [entry.infinitive, effectiveInitialTense, availableTenses]);
-
-  useEffect(() => {
-    if (tabsRef.current) {
-      const index = availableTenses.indexOf(activeTab);
-      if (index >= 0 && tabsRef.current.children[index]) {
-        const tabElement = tabsRef.current.children[index] as HTMLElement;
-        tabElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'center'
-        });
-      }
-    }
-  }, [activeTab, availableTenses]);
-
-  const scrollTabs = (direction: 'left' | 'right') => {
-    if (tabsRef.current) {
-      const scrollAmount = 100;
-      tabsRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  let currentConjugation: ConjugationSet | undefined;
-
-  if (activeTab === 'Participles') {
-    const syntheticSet: ConjugationSet = {};
-    PARTICIPLE_KEYS.forEach(key => {
-      if (entry.tenses[key]) {
-        const cachedSet = entry.tenses[key];
-        const values = Object.values(cachedSet);
-        if (values.length > 0) {
-          const displayName = TENSE_DISPLAY_NAMES[key] || key;
-          syntheticSet[displayName] = values.join(', ');
-        }
-      }
-    });
-    currentConjugation = syntheticSet;
-  } else {
-    currentConjugation = entry.tenses[activeTab];
-  }
-
-  const formatLabel = (key: string) => {
-    return TENSE_DISPLAY_NAMES[key] || key
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
-  };
-
-  const getOrderedKeys = (conj: ConjugationSet) => {
-    const standardOrder = ['io', 'tu', 'lui_lei', 'noi', 'voi', 'loro'];
-    const keys = Object.keys(conj);
-    const hasAllStandard = standardOrder.every(k => keys.includes(k));
-    if (hasAllStandard) return standardOrder;
-    return keys;
-  };
 
   return (
-    <div className={`w-full font-sans flex flex-col ${darkMode ? 'bg-slate-900' : ''}`}>
-      {/* Header */}
-      <div className={`px-4 pt-3 pb-2 border-b ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-        <div className="flex justify-between items-baseline mb-1">
-          <h3 className={`font-bold text-lg capitalize flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-            {word}
-            <span className={`text-sm font-normal italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              ({entry.infinitive})
-            </span>
-          </h3>
+    <div 
+      className="fixed z-[2147483647] bg-white rounded-[28px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] border border-slate-200/50 overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-200 ease-out flex flex-col ring-1 ring-slate-900/5 backdrop-blur-xl"
+      style={{ ...style, width: '330px' }}
+    >
+      {/* Header Section */}
+      <div className="grid grid-cols-2 bg-gradient-to-br from-white via-white to-slate-50/30 border-b border-slate-100">
+        <div className="px-5 py-4 border-r border-slate-100 relative text-left">
+          <div className="text-xl font-black text-slate-900 truncate leading-tight" title={word}>{word}</div>
+          <div className="text-[12px] font-bold text-indigo-500 mt-0.5 truncate">{wordTranslation || 'Translating...'}</div>
         </div>
-        <p className={`text-sm truncate flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-          {translation === undefined || translation === null ? (
-            <span className="opacity-50">Loading translation...</span>
-          ) : (
-            <><span>{translation}</span></>
-          )}
-        </p>
+        <div className="px-5 py-4 text-left bg-slate-50/20">
+          <div className="text-lg font-bold text-slate-800 truncate leading-tight" title={entry.infinitive}>{entry.infinitive}</div>
+          <div className="text-[12px] font-medium text-slate-500 mt-0.5 truncate italic">{infinitiveTranslation || 'Translating...'}</div>
+        </div>
       </div>
 
-      {/* Scrollable Tabs Container */}
-      <div className={`relative flex items-center border-b ${darkMode ? 'bg-slate-850 border-slate-700' : 'bg-white border-slate-100'}`}
-        style={darkMode ? { backgroundColor: '#1a2332' } : {}}>
-        {/* Left Arrow */}
-        <button
-          onClick={() => scrollTabs('left')}
-          className={`p-2 z-10 transition-colors ${darkMode ? 'text-slate-500 hover:text-indigo-400 hover:bg-slate-700/50' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50'}`}
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-        </button>
+      {/* Navigation Section */}
+      <NavRow 
+        label={mood.moodLabel} 
+        onPrev={prevMood} 
+        onNext={nextMood} 
+        canNav={entry.groups.length > 1} 
+      />
+      <NavRow 
+        label={tense.tenseLabel} 
+        onPrev={prevTense} 
+        onNext={nextTense} 
+        canNav={mood.tenses.length > 1} 
+      />
 
-        {/* Scroll Area */}
-        <div
-          ref={tabsRef}
-          className="flex-1 flex overflow-x-auto scroll-smooth no-scrollbar"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {availableTenses.map((tenseKey) => (
-            <button
-              key={tenseKey}
-              onClick={() => setActiveTab(tenseKey)}
-              className={`
-                flex-none px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors
-                ${activeTab === tenseKey
-                  ? darkMode
-                    ? 'text-indigo-400 border-b-2 border-indigo-400 bg-indigo-900/20'
-                    : 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30'
-                  : darkMode
-                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
-              `}
-            >
-              {formatLabel(tenseKey)}
-            </button>
-          ))}
+      {/* Conjugation Grid */}
+      <div className="flex-1 p-6 bg-white/40">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+          <ConjugationItem value={forms[0]} />
+          <ConjugationItem value={forms[3]} />
+          <ConjugationItem value={forms[1]} />
+          <ConjugationItem value={forms[4]} />
+          <ConjugationItem value={forms[2]} />
+          <ConjugationItem value={forms[5]} />
         </div>
-
-        {/* Right Arrow */}
-        <button
-          onClick={() => scrollTabs('right')}
-          className={`p-2 z-10 transition-colors ${darkMode ? 'text-slate-500 hover:text-indigo-400 hover:bg-slate-700/50' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50'}`}
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </button>
       </div>
 
-      {/* Grid Content */}
-      <div className={`px-4 py-3 h-[180px] overflow-y-auto ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
-        {currentConjugation ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-            {getOrderedKeys(currentConjugation).map(key => (
-              <ConjugationItem key={key} label={key.replace('_', '/')} value={currentConjugation[key]} cleanWord={cleanWord} darkMode={darkMode} />
+      {/* Suggestions Footer */}
+      {alternatives.length > 0 && (
+        <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 text-center backdrop-blur-sm">
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {alternatives.map((alt) => (
+              <button 
+                key={alt.infinitive}
+                className="px-2.5 py-1 bg-white border border-slate-200 text-indigo-600 font-bold rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all text-[10px]"
+              >
+                {alt.infinitive}
+              </button>
             ))}
           </div>
-        ) : (
-          <div className={`flex items-center justify-center h-full text-xs italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-            No data for this tense
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

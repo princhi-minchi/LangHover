@@ -1,5 +1,5 @@
 {
-  "name": "Italian Verb Conjugator Extension Demo",
+  "name": "ConjuMate Extension Demo",
   "description": "A React application demonstrating Chrome Extension logic for translating and conjugating Italian verbs upon text selection.",
   "requestFramePermissions": []
 }

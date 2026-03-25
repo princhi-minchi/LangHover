@@ -47,8 +47,17 @@ if (!(window as any).__langhoverMounted) {
       // 2. EXTENSION MODE (Real Website)
       const host = document.createElement('div');
       host.id = 'langhover-extension-host';
-      host.style.display = 'block';
       host.style.all = 'initial';
+      host.style.position = 'fixed';
+      host.style.top = '0';
+      host.style.left = '0';
+      host.style.width = '0';
+      host.style.height = '0';
+      host.style.zIndex = '2147483647';
+      host.style.overflow = 'visible';
+      host.style.zoom = '1';
+      host.style.transform = 'none';
+      host.style.display = 'block';
       document.body.appendChild(host);
 
       const shadow = host.attachShadow({ mode: 'open' });

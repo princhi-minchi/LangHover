@@ -42,7 +42,7 @@ async function translateSentence(text: string, sourceLang: string, targetLang: s
 
         const response = await fetch(`${PROXY_BASE}/deepl`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, source_lang: finalSource, target_lang: finalTarget })
         });
 

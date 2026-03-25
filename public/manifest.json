@@ -7,33 +7,24 @@
     "activeTab",
     "storage"
   ],
+  "host_permissions": [
+    "http://localhost:8787/*",
+    "https://gube-proxy.raunaksbs.workers.dev/*"
+  ],
   "content_scripts": [
     {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "assets/index.js"
-      ]
+      "matches": ["<all_urls>"],
+      "js": ["assets/index.js"]
     }
-  ],
-  "host_permissions": [
-    "https://api.ultralingua.com/*",
-    "https://translation.googleapis.com/*"
   ],
   "action": {
     "default_popup": "index.html",
-    "default_title": "ConjuMate"
+    "default_title": "Italian Verb Settings"
   },
   "web_accessible_resources": [
     {
-      "resources": [
-        "assets/*",
-        "index.html"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
+      "resources": ["assets/*.css", "assets/*.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

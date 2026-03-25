@@ -1,41 +1,72 @@
-export interface ConjugationSet {
-  [key: string]: string; // "io", "tu", "lui", "first singular", etc.
+import React from 'react';
+
+export interface VerbConjugation {
+  io: string;
+  tu: string;
+  lui_lei: string;
+  noi: string;
+  voi: string;
+  loro: string;
 }
 
 export interface VerbEntry {
   infinitive: string;
   definition: string;
-  auxiliary?: string;
-  participle?: string;
-  gerund?: string;
-  tenses: Record<string, ConjugationSet>;
+  conjugation: VerbConjugation;
 }
 
-export interface UltralinguaConjugation {
-  surfaceform: string;
-  partofspeech: {
-    person: string;
-    tense: string;
-    number: string;
-    partofspeechcategory: string;
-  };
+export interface ResponseTense {
+    tenseKey: string;
+    tenseLabel: string;
+    forms: string[];
 }
 
-export interface UltralinguaResponseItem {
-  infinitive: string;
-  conjugations: UltralinguaConjugation[];
+export interface ResponseGroup {
+    moodKey: string;
+    moodLabel: string;
+    tenses: ResponseTense[];
 }
 
-export interface UltralinguaDefinitionItem {
-  root: string;
-  surfaceform: string;
-  partofspeech: {
-    partofspeechcategory: string;
-    tense?: string;
-    number?: string;
-  };
-  text: string;
-  clarification?: string[];
+export interface ConjugationLookupResponse {
+    language: string; // Changed from 'it' to string for multi-language support
+    selection: string;
+    chosenInfinitive: string | null;
+    lookup: {
+        matchedToken: string;
+        strategy: 'surface' | 'normalized' | 'accentless';
+    };
+    initialMatch: {
+        moodKey: string;
+        moodLabel: string;
+        tenseKey: string;
+        tenseLabel: string;
+        formIndex: number;
+        storedForm: string;
+        matchMode: string;
+    } | null;
+    alternatives: Array<{
+        infinitive: string;
+        initialMatch: ConjugationLookupResponse['initialMatch'];
+    }>;
+    entry: {
+        infinitive: string;
+        groups: ResponseGroup[];
+        definition?: string;
+    } | null;
 }
 
-export type UltralinguaDefinitionResponse = UltralinguaDefinitionItem[];
+export interface SelectionState {
+  word: string;
+  response: ConjugationLookupResponse;
+  style: React.CSSProperties;
+  wordTranslation?: string;
+  infinitiveTranslation?: string;
+  sourceLanguage?: string; // Added for multi-language support
+  targetLanguage?: string; // Added for multi-language support
+}
+
+export enum SearchStatus {
+  IDLE = 'IDLE',
+  FOUND = 'FOUND',
+  NOT_FOUND = 'NOT_FOUND',
+}
