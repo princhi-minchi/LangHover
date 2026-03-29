@@ -249,7 +249,7 @@ export default function ExtensionOverlay() {
           }
         } catch (err: any) {
           // If conjugation lookup fails (404/no match), try phrase fallback
-          console.warn('Conjugation lookup failed, falling back to phrase translation');
+          console.debug('Conjugation lookup failed, falling back to phrase translation');
           const translation = await wordTranslationPromise;
           if (signal.aborted) return;
 

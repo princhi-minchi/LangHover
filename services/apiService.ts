@@ -102,6 +102,11 @@ export class ApiError extends Error {
   }
 }
 
+// Internal request options to control log verbosity
+interface InternalRequestOptions extends RequestInit {
+  _suppressedStatuses?: number[];
+}
+
 // Centralized API Service
 export class ApiService {
   private static instance: ApiService;
@@ -121,8 +126,9 @@ export class ApiService {
 
   private async makeRequest<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: InternalRequestOptions = {}
   ): Promise<T> {
+    const { _suppressedStatuses, ...fetchOptions } = options;
     try {
       const url = `${this.baseUrl}${endpoint}`;
       console.log(`[API] Making request to: ${url}`);
@@ -130,9 +136,9 @@ export class ApiService {
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
-          ...options.headers,
+          ...fetchOptions.headers,
         },
-        ...options,
+        ...fetchOptions,
       });
 
       console.log(`[API] Response status: ${response.status} ${response.statusText}`);
@@ -143,7 +149,13 @@ export class ApiService {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`[API] Error response body:`, errorText);
+        
+        // Suppress console.error if the status is explicitly in _suppressedStatuses
+        const isSuppressed = _suppressedStatuses?.includes(response.status);
+        if (!isSuppressed) {
+          console.error(`[API] Error response body:`, errorText);
+        }
+        
         throw new ApiError(
           `API request failed: ${response.statusText} (${response.status}) - ${errorText}`,
           response.status,
@@ -182,7 +194,8 @@ export class ApiService {
         {
           method: 'POST',
           body: JSON.stringify(request),
-          signal
+          signal,
+          _suppressedStatuses: [404]
         }
       );
 
@@ -192,7 +205,13 @@ export class ApiService {
       return response;
     } catch (error) {
       if (error instanceof ApiError) {
-        console.warn('API error or no match found:', error.message);
+        // 404 = no match found; this is an expected outcome, not a real error.
+        // Use debug level so it doesn't pollute the Extensions error tab.
+        if (error.status === 404) {
+          console.debug('[API] Conjugation lookup: no match (404) —', error.message);
+        } else {
+          console.warn('API error or no match found:', error.message);
+        }
       } else {
         console.error('Lookup failed:', error);
       }
