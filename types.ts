@@ -55,15 +55,37 @@ export interface ConjugationLookupResponse {
     } | null;
 }
 
-export interface SelectionState {
+export type OverlayMode = 'conjugation' | 'phrase' | 'loading';
+
+export interface LoadingSelectionState {
+  mode: 'loading';
+  word: string;
+  style: React.CSSProperties;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+}
+
+export interface ConjugationSelectionState {
+  mode: 'conjugation';
   word: string;
   response: ConjugationLookupResponse;
   style: React.CSSProperties;
   wordTranslation?: string;
   infinitiveTranslation?: string;
-  sourceLanguage?: string; // Added for multi-language support
-  targetLanguage?: string; // Added for multi-language support
+  sourceLanguage?: string;
+  targetLanguage?: string;
 }
+
+export interface PhraseSelectionState {
+  mode: 'phrase';
+  phrase: string;
+  translation?: string;
+  style: React.CSSProperties;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+}
+
+export type SelectionState = LoadingSelectionState | ConjugationSelectionState | PhraseSelectionState;
 
 export enum SearchStatus {
   IDLE = 'IDLE',

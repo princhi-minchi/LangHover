@@ -1,28 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { ConjugationLookupResponse } from '../types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { SelectionState } from '../types';
 import TranslationCard from './TranslationCard';
+import PhraseTranslationCard from './PhraseTranslationCard';
 import { apiService } from '../services/apiService';
 import { DEFAULT_SOURCE_LANGUAGE, DEFAULT_TARGET_LANGUAGE } from '../utils/languageConfig';
 
 export default function ExtensionOverlay() {
-  const [selection, setSelection] = useState<{
-    word: string;
-    response: ConjugationLookupResponse;
-    style: React.CSSProperties;
-    wordTranslation?: string;
-    infinitiveTranslation?: string;
-    sourceLanguage?: string;
-    targetLanguage?: string;
-  } | null>(null);
+  const [selection, setSelection] = useState<SelectionState | null>(null);
 
   const [sourceLanguage, setSourceLanguage] = useState<string>(DEFAULT_SOURCE_LANGUAGE);
   const [targetLanguage, setTargetLanguage] = useState<string>(DEFAULT_TARGET_LANGUAGE);
   
   // Use a ref to track the current AbortController for active requests
-  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Detect if the user is on macOS
-  const isMacOS = React.useMemo(() => {
+  const isMacOS = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
     return navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
            navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
@@ -85,11 +78,45 @@ export default function ExtensionOverlay() {
     }
   }, []);
 
-  // 0. Helper to detect host page zoom
+  // Helper to detect host page zoom
   const getPageZoomFactor = () => {
     const htmlRect = document.documentElement.getBoundingClientRect();
     if (!htmlRect.width) return 1;
     return window.innerWidth / htmlRect.width;
+  };
+
+  // Helper to compute card positioning
+  const computeCardStyle = (range: Range, cardHeight: number): React.CSSProperties => {
+    const rect = range.getBoundingClientRect();
+    const zoomFactor = getPageZoomFactor();
+    
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    const CARD_WIDTH = 330; 
+    const GAP = 12;
+
+    const correctedRect = {
+      left: rect.left / zoomFactor,
+      right: rect.right / zoomFactor,
+      top: rect.top / zoomFactor,
+      bottom: rect.bottom / zoomFactor,
+      width: rect.width / zoomFactor,
+    };
+
+    let left = correctedRect.left + (correctedRect.width / 2) - (CARD_WIDTH / 2);
+    left = Math.max(16, Math.min(left, viewportWidth - CARD_WIDTH - 16));
+
+    const spaceBelow = viewportHeight - correctedRect.bottom;
+    let style: React.CSSProperties = { left, width: CARD_WIDTH, position: 'fixed' };
+
+    if (spaceBelow < (cardHeight + GAP) && correctedRect.top > (cardHeight + GAP)) {
+      style.bottom = viewportHeight - correctedRect.top + GAP;
+    } else {
+      style.top = correctedRect.bottom + GAP;
+    }
+    
+    return style;
   };
 
   // 1. Listen to Global Document Events
@@ -100,7 +127,6 @@ export default function ExtensionOverlay() {
         const target = event.target as HTMLElement;
         const extensionHost = document.getElementById('langhover-extension-host');
         
-        // If clicking inside the extension, don't close the card
         if (extensionHost && extensionHost.contains(target)) {
           return;
         }
@@ -110,7 +136,6 @@ export default function ExtensionOverlay() {
       const isModifierKey = isMacOS ? event.metaKey : event.ctrlKey;
       
       if (!isModifierKey) {
-        // If we click without modifier, close the current card
         if (event.type === 'mouseup') {
           setSelection(null);
         }
@@ -125,11 +150,10 @@ export default function ExtensionOverlay() {
       }
 
       const text = selectionObj.toString().trim();
-      
-      // Only process single words or very short phrases (up to 2 words)
-      if (!text || text.split(/\s+/).length > 2) {
-        return;
-      }
+      if (!text) return;
+
+      // New: Calculate word count to route the request
+      const wordCount = text.split(/\s+/).length;
 
       // RACE CONDITION PREVENTION: Cancel any existing requests
       if (abortControllerRef.current) {
@@ -140,20 +164,38 @@ export default function ExtensionOverlay() {
       abortControllerRef.current = controller;
       const { signal } = controller;
 
-      console.log(`Detected selection (${isMacOS ? 'Cmd' : 'Ctrl'} held):`, text);
+      console.log(`Detected selection (${wordCount} words):`, text);
 
       // Context extraction
       const range = selectionObj.getRangeAt(0);
       const container = range.commonAncestorContainer;
-      const selectionContext = container.parentElement?.innerText || container.textContent || '';
+      const parentElement = container.nodeType === Node.ELEMENT_NODE ? container as HTMLElement : container.parentElement;
+      const selectionContext = parentElement?.innerText || container.textContent || '';
 
       try {
-        // Trigger all API calls in parallel with the abort signal
+        // ROUTING LOGIC:
+        // 1. If > 5 words, skip conjugation and go direct to phrase translation
+        if (wordCount > 5) {
+          await runPhraseTranslation(text, range, signal);
+          return;
+        }
+
+        // 2. If <= 5 words: show loading overlay immediately, then try conjugation
+        const loadingStyle = computeCardStyle(range, 250);
+        setSelection({
+          mode: 'loading',
+          word: text,
+          style: loadingStyle,
+          sourceLanguage,
+          targetLanguage
+        });
+
         const conjugationPromise = apiService.lookupConjugation(sourceLanguage, {
           selection: text,
           selectionContext: selectionContext
         }, signal);
 
+        // Fetch word translation in parallel (used for both card types)
         const wordTranslationPromise = apiService.translateWithDeepL({
           text: text,
           target_lang: targetLanguage.toUpperCase(),
@@ -161,82 +203,107 @@ export default function ExtensionOverlay() {
           context: selectionContext
         }, signal);
 
-        const data = await conjugationPromise;
-        
-        if (data.entry) {
-          // Now that we have the infinitive, fetch its translation
-          const infinitiveTranslationPromise = apiService.translateWithDeepL({
-            text: data.entry.infinitive,
-            target_lang: targetLanguage.toUpperCase(),
-            source_lang: sourceLanguage.toUpperCase()
-          }, signal);
+        try {
+          const data = await conjugationPromise;
+          
+          if (data.entry) {
+            // Conjugation found!
+            const infinitiveTranslationPromise = apiService.translateWithDeepL({
+              text: data.entry.infinitive,
+              target_lang: targetLanguage.toUpperCase(),
+              source_lang: sourceLanguage.toUpperCase()
+            }, signal);
 
-          // Wait for both translation results
-          const [wordTrans, infTrans] = await Promise.all([
-            wordTranslationPromise,
-            infinitiveTranslationPromise
-          ]);
+            const [wordTrans, infTrans] = await Promise.all([
+              wordTranslationPromise,
+              infinitiveTranslationPromise
+            ]);
 
-          // Check if we were aborted while waiting
+            if (signal.aborted) return;
+
+            const style = computeCardStyle(range, 450);
+            setSelection({
+              mode: 'conjugation',
+              word: text,
+              response: data,
+              style,
+              wordTranslation: wordTrans,
+              infinitiveTranslation: infTrans,
+              sourceLanguage,
+              targetLanguage
+            });
+          } else {
+            // No conjugation entry found, fall back to phrase translation
+            const translation = await wordTranslationPromise;
+            if (signal.aborted) return;
+            
+            const style = computeCardStyle(range, 250);
+            setSelection({
+              mode: 'phrase',
+              phrase: text,
+              translation: translation,
+              style,
+              sourceLanguage,
+              targetLanguage
+            });
+          }
+        } catch (err: any) {
+          // If conjugation lookup fails (404/no match), try phrase fallback
+          console.warn('Conjugation lookup failed, falling back to phrase translation');
+          const translation = await wordTranslationPromise;
           if (signal.aborted) return;
 
-          const rect = range.getBoundingClientRect();
-          const zoomFactor = getPageZoomFactor();
-          
-          const viewportHeight = window.innerHeight;
-          const viewportWidth = window.innerWidth;
-          
-          const CARD_WIDTH = 340;
-          const CARD_HEIGHT = 450; 
-          const GAP = 12;
-
-          // Correct raw rect for host-page zoom
-          const correctedRect = {
-            left: rect.left / zoomFactor,
-            right: rect.right / zoomFactor,
-            top: rect.top / zoomFactor,
-            bottom: rect.bottom / zoomFactor,
-            width: rect.width / zoomFactor,
-          };
-
-          // Horizontal Positioning (Clamp to viewport)
-          let left = correctedRect.left + (correctedRect.width / 2) - (CARD_WIDTH / 2);
-          left = Math.max(16, Math.min(left, viewportWidth - CARD_WIDTH - 16));
-
-          // Vertical Positioning
-          const spaceBelow = viewportHeight - correctedRect.bottom;
-          let style: React.CSSProperties = { left, width: CARD_WIDTH, position: 'fixed' };
-
-          if (spaceBelow < (CARD_HEIGHT + GAP) && correctedRect.top > (CARD_HEIGHT + GAP)) {
-            style.bottom = viewportHeight - correctedRect.top + GAP;
-          } else {
-            style.top = correctedRect.bottom + GAP;
-          }
-
+          const style = computeCardStyle(range, 250);
           setSelection({
-            word: text,
-            response: data,
+            mode: 'phrase',
+            phrase: text,
+            translation: translation,
             style,
-            wordTranslation: wordTrans,
-            infinitiveTranslation: infTrans,
             sourceLanguage,
             targetLanguage
           });
-        } else {
-          setSelection(null);
         }
       } catch (err: any) {
         if (err.name === 'AbortError') {
-          console.log('Request was cancelled due to new selection');
+          console.log('Request was cancelled');
           return;
         }
-        console.error('Lookup failed:', err);
+        console.error('Feature execution failed:', err);
         setSelection(null);
       } finally {
         if (abortControllerRef.current === controller) {
           abortControllerRef.current = null;
         }
       }
+    };
+
+    // Helper: Run phrase translation logic directly
+    const runPhraseTranslation = async (text: string, range: Range, signal: AbortSignal) => {
+      // Show card immediately with loading state
+      const style = computeCardStyle(range, 250);
+      setSelection({
+        mode: 'phrase',
+        phrase: text,
+        translation: undefined,
+        style,
+        sourceLanguage,
+        targetLanguage
+      });
+
+      const translation = await apiService.translateWithDeepL({
+        text: text,
+        target_lang: targetLanguage.toUpperCase(),
+        source_lang: sourceLanguage.toUpperCase()
+      }, signal);
+
+      if (signal.aborted) return;
+
+      setSelection(prev => {
+        if (prev?.mode === 'phrase' && prev.phrase === text) {
+          return { ...prev, translation };
+        }
+        return prev;
+      });
     };
 
     document.addEventListener('mouseup', handleGlobalSelection);
@@ -249,15 +316,64 @@ export default function ExtensionOverlay() {
 
   if (!selection) return null;
 
+  if (selection.mode === 'loading') {
+    return (
+      <div
+        className="fixed z-[2147483647] bg-white rounded-[28px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] border border-slate-200/50 overflow-hidden font-sans animate-in fade-in zoom-in-95 duration-200 ease-out flex flex-col ring-1 ring-slate-900/5 backdrop-blur-xl"
+        style={{ ...selection.style, width: '330px' }}
+      >
+        {/* Loading Header */}
+        <div className="grid grid-cols-2 bg-gradient-to-br from-white via-white to-slate-50/30 border-b border-slate-100">
+          <div className="px-5 py-4 border-r border-slate-100">
+            <div className="text-xl font-black text-slate-900 truncate leading-tight">{selection.word}</div>
+            <div className="h-3 mt-1.5 bg-slate-100 rounded animate-pulse w-16" />
+          </div>
+          <div className="px-5 py-4 bg-slate-50/20 flex flex-col justify-center gap-1.5">
+            <div className="h-3 bg-slate-100 rounded animate-pulse w-20" />
+            <div className="h-3 bg-slate-100 rounded animate-pulse w-14" />
+          </div>
+        </div>
+        {/* Loading Skeleton Body */}
+        <div className="flex-1 px-6 py-5 bg-white/40 space-y-3">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-3.5 bg-slate-100 rounded animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+            ))}
+          </div>
+        </div>
+        {/* Loading Footer */}
+        <div className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-center gap-1.5">
+          <svg className="w-3 h-3 text-indigo-400 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono">Looking up…</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <TranslationCard 
-      word={selection.word} 
-      response={selection.response} 
-      style={selection.style}
-      wordTranslation={selection.wordTranslation}
-      infinitiveTranslation={selection.infinitiveTranslation}
-      sourceLanguage={selection.sourceLanguage}
-      targetLanguage={selection.targetLanguage}
-    />
+    <>
+      {selection.mode === 'conjugation' ? (
+        <TranslationCard 
+          word={selection.word} 
+          response={selection.response} 
+          style={selection.style}
+          wordTranslation={selection.wordTranslation}
+          infinitiveTranslation={selection.infinitiveTranslation}
+          sourceLanguage={selection.sourceLanguage}
+          targetLanguage={selection.targetLanguage}
+        />
+      ) : (
+        <PhraseTranslationCard
+          phrase={selection.phrase}
+          translation={selection.translation}
+          style={selection.style}
+          sourceLanguage={selection.sourceLanguage}
+          targetLanguage={selection.targetLanguage}
+        />
+      )}
+    </>
   );
 }
