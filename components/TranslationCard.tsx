@@ -86,7 +86,7 @@ export default function TranslationCard({
                            tense?.tenseKey === initialMatch.tenseKey &&
                            value === initialMatch.storedForm;
     
-    const isVisualMatch = cleanWord ? value.toLowerCase().includes(cleanWord) : false;
+    const isVisualMatch = cleanWord ? value.toLowerCase().split(/[\s\/]+/).some(part => part === cleanWord) : false;
     const isMatch = isInitialMatch || isVisualMatch;
 
     return (
