@@ -5,14 +5,6 @@ export interface ApiConfig {
 }
 
 export const getApiConfig = (): ApiConfig => {
-  // MANUAL OVERRIDE: Force development mode for testing
-  // Comment this out for production
-  console.log('[API Config] MANUAL OVERRIDE: Forcing development mode');
-  return {
-    baseUrl: 'http://localhost:8787',
-    environment: 'development'
-  };
-
   // Check if we're in development mode - more comprehensive checks
   if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname;

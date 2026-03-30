@@ -33,22 +33,22 @@ export default function ExtensionOverlay() {
 
     const loadLanguageSettings = () => {
       if (isContextValid() && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(['sourceLanguage', 'targetLanguage'], (result) => {
+        chrome.storage.local.get(['sourceLanguage', 'targetLanguage', 'sourceLang', 'targetLang'], (result) => {
           if (chrome.runtime.lastError) {
             console.warn('Context invalidated while loading settings');
             return;
           }
-          if (result.sourceLanguage) {
-            setSourceLanguage(result.sourceLanguage);
-          }
-          if (result.targetLanguage) {
-            setTargetLanguage(result.targetLanguage);
-          }
+          
+          const sLang = result.sourceLanguage || result.sourceLang;
+          const tLang = result.targetLanguage || result.targetLang;
+          
+          if (sLang) setSourceLanguage(sLang);
+          if (tLang) setTargetLanguage(tLang);
         });
       } else {
         // Fallback for dev mode or invalidated context
-        const savedSourceLang = localStorage.getItem('sourceLanguage');
-        const savedTargetLang = localStorage.getItem('targetLanguage');
+        const savedSourceLang = localStorage.getItem('sourceLanguage') || localStorage.getItem('sourceLang');
+        const savedTargetLang = localStorage.getItem('targetLanguage') || localStorage.getItem('targetLang');
         if (savedSourceLang) setSourceLanguage(savedSourceLang);
         if (savedTargetLang) setTargetLanguage(savedTargetLang);
       }
