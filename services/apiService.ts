@@ -189,10 +189,14 @@ export class ApiService {
     console.log(`Fetching ${language} conjugation lookup with context:`, request.selectionContext.slice(0, 50) + '...');
     
     try {
+      const userId = await getUserId();
       const response = await this.makeRequest<ConjugationLookupResponse>(
         `/api/${endpoint}/conjugation-lookup`,
         {
           method: 'POST',
+          headers: {
+            'x-user-id': userId
+          },
           body: JSON.stringify(request),
           signal,
           _suppressedStatuses: [404]
