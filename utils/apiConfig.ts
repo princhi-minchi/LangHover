@@ -5,43 +5,26 @@ export interface ApiConfig {
 }
 
 export const getApiConfig = (): ApiConfig => {
-  // Check if we're in development mode - more comprehensive checks
+  // Check if we're running on a local dev server (Vite dev mode only)
   if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname;
-    
-    // Explicit development checks
+
     if (
-      hostname === 'localhost' || 
+      hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
-      hostname.includes('dev') ||
-      hostname.includes('local') ||
-      // Check if we're running on a local development server
       hostname.startsWith('192.168.') ||
       hostname.startsWith('10.') ||
       hostname.startsWith('172.')
     ) {
-      console.log('[API Config] Using development environment');
       return {
         baseUrl: 'http://localhost:8787',
         environment: 'development'
       };
     }
   }
-  
-  // For Chrome extension content scripts, window.location might be undefined
-  // In that case, we need to check if we're in a development context
-  if (typeof window !== 'undefined' && !window.location) {
-    // We're likely in a Chrome extension content script
-    // Try to detect if we're in development by checking if we can access localhost
-    console.log('[API Config] Chrome extension detected, defaulting to development');
-    return {
-      baseUrl: 'http://localhost:8787',
-      environment: 'development'
-    };
-  }
-  
-  // Production environment
-  console.log('[API Config] Using production environment');
+
+  // Production — covers packaged Chrome extension content scripts
+  // (window.location in a content script reflects the host page URL, not a local address)
   return {
     baseUrl: 'https://gube-proxy.raunaksbs.workers.dev',
     environment: 'production'

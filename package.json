@@ -1,7 +1,7 @@
 {
-  "name": "italian-verb-conjugator-extension-demo",
+  "name": "conjumate-translator-conjugator",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

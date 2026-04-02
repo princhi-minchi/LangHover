@@ -1,14 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "ConjuMate",
+  "name": "ConjuMate - Translator and Conjugator",
   "version": "1.0",
-  "description": "Instant Italian verb translations and conjugations on any webpage.",
+  "description": "Instant conjugations and translations on any webpage.",
+  "icons": {
+    "16": "icons/logo_16x16px.PNG",
+    "48": "icons/logo_48x48px.PNG",
+    "128": "icons/logo_128x128px.PNG"
+  },
   "permissions": [
     "activeTab",
     "storage"
   ],
   "host_permissions": [
-    "http://localhost:8787/*",
     "https://gube-proxy.raunaksbs.workers.dev/*"
   ],
   "content_scripts": [
@@ -19,11 +23,15 @@
   ],
   "action": {
     "default_popup": "index.html",
-    "default_title": "Italian Verb Settings"
+    "default_title": "ConjuMate",
+    "default_icon": {
+      "16": "icons/logo_16x16px.PNG",
+      "48": "icons/logo_48x48px.PNG"
+    }
   },
   "web_accessible_resources": [
     {
-      "resources": ["assets/*.css", "assets/*.js"],
+      "resources": ["assets/*.css", "assets/*.js", "icons/*"],
       "matches": ["<all_urls>"]
     }
   ]
