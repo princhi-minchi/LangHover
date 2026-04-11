@@ -9,7 +9,6 @@
     "128": "icons/logo_128x128px.PNG"
   },
   "permissions": [
-    "activeTab",
     "storage"
   ],
   "host_permissions": [

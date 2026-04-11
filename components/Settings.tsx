@@ -55,6 +55,10 @@ export default function Settings() {
 
     return (
         <div className="p-4 w-96 bg-white max-h-[600px] overflow-y-auto">
+            <div className="mb-4 p-3 bg-indigo-50 text-indigo-800 rounded-md text-sm text-center border border-indigo-100 font-medium">
+                Hold Ctrl/Cmd and select text to activate the extension
+            </div>
+            
             <h1 className="text-xl font-bold mb-4 text-slate-800">Language Settings</h1>
 
             <div className="mb-6">
